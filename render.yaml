@@ -60,6 +60,6 @@ services:
         #   • your extension origin: chrome-extension://<EXTENSION_ID>
         # You won't know the extension id until you load it once — see docs/DEPLOY.md,
         # then edit this value in the Render dashboard (no redeploy of code needed).
-        value: "https://YOUR-DOMAIN.com,https://signal-desk-api.onrender.com,chrome-extension://REPLACE_WITH_EXTENSION_ID"
+        value: "https://signal-desk.darkrumi.in,https://signal-desk-api-h6fn.onrender.com,chrome-extension://REPLACE_WITH_EXTENSION_ID"
       - key: PYTHON_VERSION
         value: "3.12.6"

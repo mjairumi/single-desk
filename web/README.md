@@ -1,25 +1,63 @@
 # Web app
 
-The web app is the Signal Desk UI you already have, wired to the API instead of `localStorage`, behind a login gate, with a **Sessions** ("Groups") view added.
+**The live web app now lives in [`../backend/app/static/`](../backend/app/static/)** and is
+served same-origin by FastAPI at `/`. This directory keeps the original
+localStorage build as a reference.
 
 ## Files
-- `legacy-localstorage-ui.html` — the current single-file UI (buckets, review, playbook, Explore). **This is your UI starting point.** It stores everything in `localStorage`.
-- `api-client.js` — drop-in data layer: `Auth`, `Store` (IndexedDB), `upsertItem/deleteItem/upsertSession`, `syncNow()`, `liveItems()/liveSessions()`, `isLoggedIn()`.
 
-## Adaptation steps (milestone M3)
-1. **Serve it from the API.** Put the built web app in `backend/app/static/` (FastAPI already mounts that dir at `/`). Then the API base is same-origin — `api-client.js` defaults to `window.location.origin`.
-2. **Add an auth gate.** Before rendering the app, `if (!isLoggedIn())` show a small login/signup screen that calls `Auth.login()/Auth.signup()`, then boot the app.
-3. **Swap the data layer.** In the legacy UI, the state lives in `state.items` and is persisted by `load()`/`save()` against `localStorage`. Replace:
-   - `load()` → read from the cache: `state.items = await liveItems()` (and `sessions = await liveSessions()`), after a `syncNow()`.
-   - every mutation (`addItem`, `moveTo`, `snooze`, `remove`, edits) → call `upsertItem({...})` / `deleteItem(id)` from `api-client.js` instead of mutating the array + `save()`. Keep the same field names — they already match the API (bucket, tags, cadence_days→note the legacy UI uses `cadenceDays`; **rename to snake_case** or map in a thin adapter).
-   - after each mutation, re-render from the store and let the periodic `syncNow()` push it.
-4. **Periodic + reconnect sync.** `setInterval(syncNow, 60_000)`, plus `window.addEventListener("online", syncNow)` and a `syncNow()` on load.
-5. **Sessions view.** Add a nav item "Groups". Render `liveSessions()` — each session shows its name + tab count and a list of links. "Restore":
-   - if the extension is installed, message it (`chrome.runtime.sendMessage` to your extension id) to `restore-session`;
-   - otherwise just render the links for the user to open. (A plain web page can't open a whole window of tabs.)
+| Path | What it is |
+|---|---|
+| `../backend/app/static/index.html` | Markup + all styling (carried over unchanged from the legacy build) |
+| `../backend/app/static/app.js` | The application — views, review mode, modals, sync loop |
+| `../backend/app/static/api-client.js` | Data layer: `Auth`, `Store` (IndexedDB), mutations, `syncNow()` |
+| `legacy-localstorage-ui.html` | The original single-file localStorage version. **Reference only** — not served, not wired to the API. |
 
-## Field mapping note
-The legacy UI uses camelCase (`cadenceDays`, `lastVisited`, `shelfDays`, `addedAt`, `archivedAt`, `snoozedUntil`). The API/`api-client.js` use snake_case. Do the rename once (cleanest), or add a tiny `toApi()/fromApi()` adapter. Don't ship both spellings.
+No build step: `index.html` loads `app.js` as an ES module, which imports
+`api-client.js`.
 
-## Offline
-`api-client.js` caches in IndexedDB and marks local edits `_dirty`; the app renders from the cache, so it works offline and syncs when back online. (The legacy localStorage file also still works fully offline as a no-account fallback if you ever want that mode.)
+## How the port works
+
+- **Auth gate.** `boot()` checks `isLoggedIn()`. Logged out shows `#authGate`
+  (login / signup); logged in reveals `#appShell`. A refresh token that the
+  server rejects drops you back to the gate mid-session.
+- **One entity shape.** Rows are held in exactly the API's shape — snake_case
+  fields, ISO-8601 timestamps — so sync payloads are 1:1 with the server. The
+  legacy UI used camelCase and epoch-ms and did arithmetic directly on the
+  numbers; `ms()` parses at the point of use instead, so there is only ever one
+  spelling of a field.
+- **Mutations** go through `upsertItem` / `deleteItem` / `upsertSession`, which
+  stamp `updated_at` and mark the row `_dirty`. Then `afterMutation()` re-reads
+  the cache, re-renders, and schedules a debounced push.
+- **Sync loop.** On load, every 60 s, on `online`, on tab focus, and 1.2 s after
+  any edit. Failures are non-fatal: the IndexedDB cache is authoritative and the
+  status line reads "offline — changes saved locally".
+- **Deletes are tombstones** (`deleted = true`), never row removal, so they
+  propagate to other devices.
+
+## Deliberate behaviour changes from the legacy build
+
+- **Restore from backup merges, it no longer replaces.** A destructive replace
+  would tombstone rows on every synced device. Items are merged by id, and only
+  when the backup copy has a newer `updated_at`.
+- **Export downloads a file** via a Blob URL instead of calling the
+  artifact-host `window.claude.use("downloads")` bridge, with clipboard and a
+  copyable panel as fallbacks.
+- **The `[data-close]` handler is delegated.** The legacy build bound it once at
+  boot, which left the review "Desk cleared" → *Done* button dead, since that
+  card is rendered later.
+- **Theme and the default shelf life stay in `localStorage`** as per-device
+  preferences. They aren't entities in the data model, so they don't sync.
+
+## Groups (tab sessions)
+
+The Groups view lists synced `tab_sessions`, and supports rename, delete, and
+opening the links. **Capturing** a window and **restoring** it into real Chrome
+tab groups requires the extension — a web page can't enumerate your tabs or open
+a window of them.
+
+## Testing
+
+`../backend/tests/web_e2e.py` drives the whole thing in headless Chromium,
+including two browser contexts on one account to prove sync converges. See
+`../docs/LOCAL_SETUP.md`.

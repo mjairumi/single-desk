@@ -131,11 +131,22 @@ rejection.
 
 ## The web app
 
-`backend/app/static/` is mounted at `/` as a catch-all, so anything you drop
-there is served same-origin with the API. It's empty today — the UI still needs
-porting from `web/legacy-localstorage-ui.html` onto `web/api-client.js`
-(roadmap M3). While it's empty, FastAPI simply skips the mount and only `/api/*`
-responds.
+Open <http://localhost:8000> — it's served from `backend/app/static/`, mounted
+at `/` as a catch-all, same-origin with the API. Sign up on the gate and the
+desk is yours; it syncs to any other browser or device signed into the same
+account.
+
+To drive the whole thing in a real browser (signup, add/edit/delete, reload
+persistence, and two contexts on one account converging):
+
+```bash
+cd backend && source .venv/bin/activate
+pip install playwright && playwright install chromium
+python tests/web_e2e.py          # with the server running -> ALL M3 CHECKS PASSED
+```
+
+It signs up throwaway `web+<random>@example.com` accounts, so point it at a
+local server, never production.
 
 ## The extension
 

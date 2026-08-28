@@ -14,11 +14,11 @@ signup / login / refresh (rotating) / logout / me.
 `GET/POST /api/sync`, per-user `rev`, last-write-wins, tombstones.
 **Check:** the full sync flow in `docs/SYNC.md#verifying` passes. **Turn it into `backend/tests/test_sync.py` (pytest + httpx).**
 
-## M3 — Web app on the API  ⟵ start here
-Adapt `web/` from localStorage to the API: login/signup gate + `SyncClient` + IndexedDB cache (offline) + a **Sessions** ("Groups") view. Keep every existing bucket/review/playbook feature. Serve it from FastAPI (`backend/app/static/`) or as a Render Static Site.
-**Check:** sign up on the web app; add/edit/delete items and a session; reload → state persists; open in a second browser signed into the same account → changes appear after sync.
+## M3 — Web app on the API ✅
+Login/signup gate + IndexedDB cache (offline) + a **Groups** (tab sessions) view, served from FastAPI at `backend/app/static/`. Every bucket/review/playbook feature carried over; entities are held in the API's own snake_case + ISO-8601 shape.
+**Check:** passes — `backend/tests/web_e2e.py` drives headless Chromium through signup, add/edit/delete, reload persistence, and two browser contexts on one account converging in both directions (tombstones included).
 
-## M4 — Extension: capture + auth + entity sync
+## M4 — Extension: capture + auth + entity sync  ⟵ start here
 Wire Options login, popup quick-capture, and the alarm sync loop (`sync.js`). No bookmarks yet.
 **Check:** capture a tab in the extension → it appears in the web app (and vice-versa) within one sync interval.
 

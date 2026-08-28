@@ -1,6 +1,6 @@
 // Runtime config for the extension. API base is user-editable in options.
 export const DEFAULTS = {
-  apiBase: "https://YOUR-DOMAIN.com",   // e.g. https://signal-desk-api.onrender.com
+  apiBase: "https://signal-desk.darkrumi.in",  // overridden by the Options page
   managedRootName: "Signal Desk",       // the bookmark folder we own and mirror
   // Buckets mirrored to Chrome bookmark folders. Archive is intentionally NOT
   // mirrored (it's a hospice — see docs/EXTENSION.md).

@@ -1,0 +1,488 @@
+<meta charset="utf-8">
+<title>Signal Desk</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+/* ---------- Tokens: light is the base :root ---------- */
+:root{
+  --bg:#E7ECE9;
+  --surface:#FBFCFB;
+  --surface-2:#F0F3F1;
+  --ink:#19231F;
+  --muted:#5B6B63;
+  --faint:#8A988F;
+  --line:#D3DAD5;
+  --line-strong:#C1CAC4;
+  --accent:#0F6E66;
+  --accent-ink:#FBFCFB;
+  --accent-soft:#DCEBE8;
+  --warn:#9A6A15;
+  --warn-soft:#F3E6CB;
+  --crit:#AF4632;
+  --crit-soft:#F4DDD6;
+  --ok:#2E7050;
+  --shadow:0 1px 2px rgba(20,35,30,.05),0 8px 24px -12px rgba(20,35,30,.18);
+  --radius:11px;
+  --radius-sm:8px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10140F;
+    --surface:#191E1A;
+    --surface-2:#20261F;
+    --ink:#E7EDE7;
+    --muted:#9AA79E;
+    --faint:#6E7C72;
+    --line:#2A322B;
+    --line-strong:#37413A;
+    --accent:#33A99C;
+    --accent-ink:#0C110F;
+    --accent-soft:#173630;
+    --warn:#D6A24C;
+    --warn-soft:#33290F;
+    --crit:#E27a63;
+    --crit-soft:#38201A;
+    --ok:#5DB98B;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10140F;
+  --surface:#191E1A;
+  --surface-2:#20261F;
+  --ink:#E7EDE7;
+  --muted:#9AA79E;
+  --faint:#6E7C72;
+  --line:#2A322B;
+  --line-strong:#37413A;
+  --accent:#33A99C;
+  --accent-ink:#0C110F;
+  --accent-soft:#173630;
+  --warn:#D6A24C;
+  --warn-soft:#33290F;
+  --crit:#E27a63;
+  --crit-soft:#38201A;
+  --ok:#5DB98B;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -14px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-family:"Archivo","IBM Plex Sans",sans-serif;margin:0;text-wrap:balance;letter-spacing:-.01em}
+a{color:inherit}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+::selection{background:var(--accent-soft)}
+
+.wrap{max-width:1060px;margin:0 auto;padding:0 20px}
+
+/* ---------- Header ---------- */
+header.top{
+  position:sticky;top:0;z-index:40;
+  background:color-mix(in srgb,var(--bg) 86%,transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.top-inner{display:flex;align-items:center;gap:16px;height:60px}
+.brand{display:flex;align-items:center;gap:10px;font-family:"Archivo";font-weight:800;font-size:18px;letter-spacing:-.02em;white-space:nowrap}
+.brand .glyph{
+  width:26px;height:26px;border-radius:7px;flex:none;
+  background:radial-gradient(circle at 30% 30%,var(--accent),color-mix(in srgb,var(--accent) 55%,#000));
+  position:relative;
+}
+.brand .glyph::after{content:"";position:absolute;inset:0;border-radius:7px;
+  background:
+    radial-gradient(circle at 50% 50%,transparent 30%,color-mix(in srgb,var(--accent-ink) 55%,transparent) 31%,transparent 34%),
+    radial-gradient(circle at 50% 50%,transparent 48%,color-mix(in srgb,var(--accent-ink) 45%,transparent) 49%,transparent 52%);
+}
+nav.views{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
+nav.views::-webkit-scrollbar{display:none}
+.navbtn{
+  border:0;background:transparent;color:var(--muted);
+  padding:8px 12px;border-radius:8px;font-weight:500;white-space:nowrap;
+  display:flex;align-items:center;gap:7px;position:relative;
+}
+.navbtn:hover{background:var(--surface-2);color:var(--ink)}
+.navbtn.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.navbtn .count{
+  font-size:11px;font-weight:600;font-family:"IBM Plex Mono";
+  background:var(--line);color:var(--muted);border-radius:20px;padding:1px 7px;min-width:20px;text-align:center;
+}
+.navbtn.active .count{background:var(--accent-soft);color:var(--accent)}
+.navbtn .count.alert{background:var(--crit-soft);color:var(--crit)}
+.navbtn .count.warn{background:var(--warn-soft);color:var(--warn)}
+.top-actions{display:flex;gap:8px;align-items:center}
+
+.btn{
+  border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);
+  padding:8px 14px;border-radius:9px;font-weight:600;display:inline-flex;align-items:center;gap:7px;
+  transition:transform .06s ease,background .15s ease,border-color .15s ease;
+}
+.btn:hover{background:var(--surface-2);border-color:var(--faint)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.btn.primary:hover{background:color-mix(in srgb,var(--accent) 88%,#000)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted);padding:8px 10px}
+.btn.ghost:hover{background:var(--surface-2);color:var(--ink)}
+.btn.sm{padding:5px 10px;font-size:13px;font-weight:500;border-radius:7px}
+.btn.danger:hover{border-color:var(--crit);color:var(--crit)}
+.icon-btn{width:38px;height:38px;padding:0;justify-content:center}
+
+main{padding:28px 0 96px}
+.view{display:none;animation:fade .25s ease}
+.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- Overview ---------- */
+.hero{margin-bottom:26px}
+.eyebrow{font-family:"IBM Plex Mono";font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:500}
+.hero h1{font-size:clamp(28px,4.5vw,40px);font-weight:800;margin:8px 0 6px;line-height:1.05}
+.hero p{color:var(--muted);max-width:60ch;margin:0}
+
+.attn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:22px 0}
+.attn{
+  text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);
+  padding:16px 16px 15px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+}
+.attn .stripe{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line-strong)}
+.attn.hot .stripe{background:var(--crit)}
+.attn.warm .stripe{background:var(--warn)}
+.attn.go .stripe{background:var(--accent)}
+.attn .n{font-family:"Archivo";font-weight:800;font-size:34px;line-height:1;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px}
+.attn .n small{font-size:13px;font-weight:600;color:var(--muted);font-family:"IBM Plex Sans")}
+.attn .lbl{color:var(--muted);font-size:13px;margin-top:8px;display:block}
+.attn .lbl b{color:var(--ink);font-weight:600}
+.attn.clickable{cursor:pointer;transition:transform .08s ease,border-color .15s ease}
+.attn.clickable:hover{transform:translateY(-2px);border-color:var(--faint)}
+
+.overview-cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:6px 0 30px}
+.overview-cta .hint{color:var(--faint);font-size:13px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.panel-pad{padding:20px}
+.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:34px 0 14px}
+.section-title h2{font-size:19px;font-weight:700}
+.section-title .sub{color:var(--faint);font-size:13px}
+
+/* quick add */
+.qadd{display:flex;gap:10px;flex-wrap:wrap}
+.qadd input{flex:1;min-width:220px}
+input,select,textarea{
+  font-family:inherit;font-size:14px;color:var(--ink);background:var(--surface);
+  border:1px solid var(--line-strong);border-radius:9px;padding:9px 11px;width:100%;
+}
+input:focus,select,textarea:focus{outline:none;border-color:var(--accent)}
+textarea{resize:vertical;min-height:64px}
+label.field{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px;letter-spacing:.02em}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>*{flex:1;min-width:0}
+
+/* ---------- Item cards ---------- */
+.list{display:flex;flex-direction:column;gap:10px}
+.item{
+  display:flex;gap:14px;align-items:flex-start;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 15px;box-shadow:var(--shadow);
+}
+.item .fav{width:30px;height:30px;border-radius:7px;flex:none;background:var(--surface-2);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent);font-family:"Archivo";overflow:hidden}
+.item .fav img{width:100%;height:100%;object-fit:cover}
+.item .body{flex:1;min-width:0}
+.item .title{font-weight:600;line-height:1.3;word-break:break-word}
+.item .title a{text-decoration:none}
+.item .title a:hover{text-decoration:underline;text-decoration-color:var(--faint)}
+.item .url{font-family:"IBM Plex Mono";font-size:12px;color:var(--faint);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.item .note{color:var(--muted);font-size:13px;margin-top:7px;word-break:break-word}
+.item .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:9px}
+.tag{font-size:11px;font-family:"IBM Plex Mono";color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:2px 9px}
+.pill{font-size:11px;font-weight:600;border-radius:20px;padding:2px 9px;display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Sans"}
+.pill.due{background:var(--warn-soft);color:var(--warn)}
+.pill.over{background:var(--crit-soft);color:var(--crit)}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.pill.dot::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.item .acts{display:flex;gap:5px;align-items:center;flex-wrap:wrap;flex:none}
+.item .acts .btn.sm{border-color:var(--line)}
+
+.empty{text-align:center;padding:52px 20px;color:var(--muted)}
+.empty .big{font-family:"Archivo";font-weight:700;font-size:20px;color:var(--ink);margin-bottom:8px}
+.empty p{max-width:46ch;margin:0 auto 18px}
+
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.toolbar input.search{max-width:280px}
+.toolbar .spacer{flex:1}
+.filter-tags{display:flex;gap:6px;flex-wrap:wrap}
+.filter-tags .tag{cursor:pointer}
+.filter-tags .tag.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+
+/* ---------- Modal / overlay ---------- */
+.overlay{position:fixed;inset:0;z-index:80;background:rgba(10,16,12,.5);backdrop-filter:blur(3px);
+  display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 30px 80px -20px rgba(0,0,0,.5);
+  width:100%;max-width:540px;animation:pop .2s ease}
+.modal.wide{max-width:720px}
+@keyframes pop{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line)}
+.modal-head h3{font-size:17px;font-weight:700}
+.modal-body{padding:20px;display:flex;flex-direction:column;gap:14px}
+.modal-foot{padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.seg{display:flex;gap:0;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--surface);color:var(--muted);padding:9px 4px;font-weight:600;font-size:12.5px;white-space:nowrap;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+
+/* ---------- Review overlay ---------- */
+.review-shell{width:100%;max-width:640px}
+.review-progress{height:5px;background:var(--line);border-radius:20px;overflow:hidden;margin-bottom:18px}
+.review-progress i{display:block;height:100%;background:var(--accent);transition:width .3s ease}
+.review-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 30px 80px -20px rgba(0,0,0,.5);overflow:hidden}
+.review-reason{padding:12px 20px;background:var(--surface-2);border-bottom:1px solid var(--line);font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.review-main{padding:22px 22px 6px}
+.review-main .title{font-family:"Archivo";font-weight:700;font-size:20px;line-height:1.2;word-break:break-word}
+.review-main .url{font-family:"IBM Plex Mono";font-size:12.5px;color:var(--faint);margin-top:6px;word-break:break-all}
+.review-main .note{color:var(--muted);margin-top:12px}
+.review-acts{padding:16px 22px 22px;display:flex;gap:8px;flex-wrap:wrap}
+.review-rule{margin-top:14px;border-top:1px dashed var(--line-strong);padding-top:14px}
+.review-rule h4{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin:0 0 8px;font-family:"IBM Plex Mono";font-weight:500}
+.review-rule ol{margin:0;padding-left:18px;color:var(--muted);font-size:13.5px}
+.review-rule li{margin-bottom:5px}
+.review-rule b{color:var(--ink)}
+.review-nav{display:flex;justify-content:space-between;align-items:center;margin-top:14px;color:var(--faint);font-size:13px}
+
+/* ---------- Playbook ---------- */
+.playbook{max-width:720px}
+.playbook .lede{font-size:18px;color:var(--muted);margin:0 0 8px;max-width:62ch}
+.pb-block{margin:30px 0}
+.pb-block h2{font-size:22px;font-weight:700;margin-bottom:6px}
+.pb-block h3{font-size:16px;font-weight:700;margin:18px 0 4px;font-family:"IBM Plex Sans"}
+.pb-block p{color:var(--muted);margin:8px 0;max-width:64ch}
+.pb-block p b,.pb-block li b{color:var(--ink)}
+.pb-block ol,.pb-block ul{color:var(--muted);max-width:64ch;padding-left:20px}
+.pb-block li{margin:6px 0}
+.bucket-def{display:flex;gap:14px;padding:16px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);margin:10px 0;box-shadow:var(--shadow)}
+.bucket-def .k{font-family:"Archivo";font-weight:800;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);border-radius:7px;padding:6px 10px;height:fit-content;white-space:nowrap}
+.bucket-def .d h3{margin:0 0 4px}
+.bucket-def .d p{margin:2px 0}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 var(--radius) var(--radius) 0;padding:14px 16px;margin:16px 0}
+.callout p{color:var(--ink);margin:0}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+
+.footnote{color:var(--faint);font-size:12.5px;margin-top:40px;border-top:1px solid var(--line);padding-top:16px;max-width:64ch}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;
+  background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:14px;font-weight:500;
+  z-index:120;transition:transform .25s ease,opacity .25s ease;pointer-events:none;box-shadow:var(--shadow)}
+.toast.show{transform:translateX(-50%);opacity:1}
+
+.menu{position:absolute;right:0;top:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+  padding:6px;display:none;flex-direction:column;min-width:210px;z-index:50}
+.menu.open{display:flex}
+.menu button{border:0;background:transparent;text-align:left;color:var(--ink);padding:9px 11px;border-radius:8px;font-weight:500;display:flex;align-items:center;gap:9px;font-size:14px}
+.menu button:hover{background:var(--surface-2)}
+.menu .sep{height:1px;background:var(--line);margin:5px 4px}
+.menu .mono{font-size:11px;color:var(--faint);padding:4px 11px}
+.pos{position:relative}
+
+.item.flash{animation:flashcard 1.5s ease}
+@keyframes flashcard{0%{box-shadow:0 0 0 2px var(--accent)}55%{box-shadow:0 0 0 2px var(--accent),0 0 26px -4px var(--accent)}100%{box-shadow:var(--shadow)}}
+.explore-nudge{margin-top:22px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--accent);border-radius:var(--radius);padding:13px 16px}
+.explore-nudge .txt{flex:1;min-width:220px;color:var(--ink);font-size:14px}
+.explore-nudge .txt b{color:var(--accent)}
+
+@media (max-width:680px){
+  .top-inner{height:auto;flex-wrap:wrap;padding:10px 0;gap:10px}
+  nav.views{order:3;width:100%;flex:none}
+  .item{flex-wrap:wrap}
+  .item .acts{width:100%;margin-top:6px}
+}
+</style>
+
+<style>
+/* ---------- additions for the synced build: auth gate, Groups, sync status ---------- */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.auth-card{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.auth-head{padding:26px 26px 0}
+.auth-head .brand{font-family:"Archivo";font-weight:800;font-size:22px;display:flex;align-items:center;gap:9px;margin-bottom:6px}
+.auth-head .brand .glyph{width:15px;height:15px;border-radius:4px;background:var(--accent);display:inline-block}
+.auth-head p{color:var(--muted);margin:0 0 18px;font-size:14px}
+.auth-tabs{display:flex;gap:6px;padding:0 26px 4px}
+.auth-tabs button{flex:1;padding:9px 0;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);border-radius:9px;cursor:pointer;font:inherit;font-size:14px}
+.auth-tabs button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.auth-body{padding:16px 26px 24px;display:flex;flex-direction:column;gap:13px}
+.auth-body input{width:100%}
+.auth-err{display:none;background:rgba(200,70,50,.12);border:1px solid var(--danger,#af4632);color:var(--danger,#af4632);border-radius:9px;padding:9px 11px;font-size:13.5px}
+.auth-foot{padding:0 26px 26px}
+.auth-foot .btn{width:100%;justify-content:center}
+.auth-note{color:var(--faint);font-size:12.5px;text-align:center;margin-top:14px;line-height:1.5}
+.sync-ok{color:var(--faint)}
+.sync-busy{color:var(--accent)}
+.sync-warn{color:#b0761f}
+ul.tablist{list-style:none;margin:9px 0 0;padding:0;display:flex;flex-direction:column;gap:3px;max-height:190px;overflow:auto}
+ul.tablist li{font-size:13.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ul.tablist li a{color:var(--muted);text-decoration:none}
+ul.tablist li a:hover{color:var(--accent);text-decoration:underline}
+</style>
+
+<!-- ---------------- Auth gate ---------------- -->
+<div class="auth-wrap" id="authGate" style="display:none">
+  <div class="auth-card">
+    <div class="auth-head">
+      <div class="brand"><span class="glyph"></span>Signal&nbsp;Desk</div>
+      <p id="authHint">Welcome back.</p>
+    </div>
+    <div class="auth-tabs">
+      <button id="authTabLogin" class="on">Log in</button>
+      <button id="authTabSignup">Sign up</button>
+    </div>
+    <div class="auth-body" id="authForm">
+      <div class="auth-err" id="authError"></div>
+      <div id="authNameRow" style="display:none">
+        <label class="field">Display name <span style="color:var(--faint);font-weight:400">(optional)</span></label>
+        <input id="authName" autocomplete="name" placeholder="What should we call you?">
+      </div>
+      <div>
+        <label class="field">Email</label>
+        <input id="authEmail" type="email" autocomplete="username" placeholder="you@example.com">
+      </div>
+      <div>
+        <label class="field">Password</label>
+        <input id="authPassword" type="password" autocomplete="current-password" placeholder="At least 8 characters">
+      </div>
+    </div>
+    <div class="auth-foot">
+      <button class="btn primary" id="authSubmit">Log in</button>
+      <div class="auth-note">Your desk syncs across every device you sign in on — this browser, and the Chrome extension.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ---------------- App ---------------- -->
+<div id="appShell" style="display:none">
+
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="brand"><span class="glyph"></span>Signal&nbsp;Desk</div>
+    <nav class="views" id="nav"></nav>
+    <div class="top-actions">
+      <button class="btn primary sm" id="addBtn">+ Add</button>
+      <div class="pos">
+        <button class="btn ghost icon-btn" id="menuBtn" title="More" aria-label="More options">⋯</button>
+        <div class="menu" id="menu">
+          <button data-m="import">⇩ Import links…</button>
+          <button data-m="export">⤓ Export backup (JSON)</button>
+          <button data-m="importjson">⇧ Restore from backup</button>
+          <div class="sep"></div>
+          <button data-m="sync">⟳ Sync now</button>
+          <button data-m="theme">◐ Theme: <span id="themeLabel">System</span></button>
+          <div class="sep"></div>
+          <button data-m="logout">⏻ Log out</button>
+          <div class="sep"></div>
+          <div class="mono" id="syncInfo">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="main"></main>
+
+<!-- Add / Edit modal -->
+<div class="overlay" id="editOverlay">
+  <div class="modal">
+    <div class="modal-head"><h3 id="editTitle">Add a link</h3><button class="btn ghost icon-btn" data-close>✕</button></div>
+    <div class="modal-body">
+      <div><label class="field" id="f-url-label">URL</label><input id="f-url" placeholder="https://…" autocomplete="off"></div>
+      <div id="f-explore-hint" style="display:none;font-size:12.5px;color:var(--muted);margin-top:-8px">Capturing a book or an idea? A URL is optional here — a title alone is enough.</div>
+      <div><label class="field">Title <span style="color:var(--faint);font-weight:400">(optional — auto-filled from the address)</span></label><input id="f-title" placeholder="What is this?"></div>
+      <div>
+        <label class="field">Which bucket?</label>
+        <div class="seg" id="f-bucket">
+          <button data-b="inbox" class="on">Inbox</button>
+          <button data-b="library">Library</button>
+          <button data-b="rounds">Rounds</button>
+          <button data-b="queue">Read-later</button>
+          <button data-b="explore">Explore</button>
+        </div>
+      </div>
+      <div class="row" id="f-cadence-row" style="display:none">
+        <div><label class="field">Revisit every</label>
+          <select id="f-cadence">
+            <option value="1">Day</option>
+            <option value="7" selected>Week</option>
+            <option value="14">2 weeks</option>
+            <option value="30">Month</option>
+            <option value="90">Quarter</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" id="f-shelf-row" style="display:none">
+        <div><label class="field">Read within</label>
+          <select id="f-shelf">
+            <option value="7">1 week</option>
+            <option value="14">2 weeks</option>
+            <option value="30" selected>1 month</option>
+            <option value="60">2 months</option>
+          </select>
+        </div>
+      </div>
+      <div><label class="field">Tags <span style="color:var(--faint);font-weight:400">(comma-separated)</span></label><input id="f-tags" placeholder="e.g. tooling, reference, ai"></div>
+      <div><label class="field">Note <span style="color:var(--faint);font-weight:400">(why you're keeping it)</span></label><textarea id="f-note" placeholder="One line on what this is for. Future-you will thank present-you."></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="saveItem">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import modal -->
+<div class="overlay" id="importOverlay">
+  <div class="modal wide">
+    <div class="modal-head"><h3>Import your pile</h3><button class="btn ghost icon-btn" data-close>✕</button></div>
+    <div class="modal-body">
+      <p style="color:var(--muted);margin:0">Everything you import lands in the <b>Inbox</b>, unsorted. That's on purpose — you'll triage it during a Review, not all at once now.</p>
+      <div>
+        <label class="field">Paste URLs — one per line</label>
+        <textarea id="imp-text" style="min-height:130px" placeholder="https://…&#10;https://…&#10;news.ycombinator.com/item?id=…"></textarea>
+      </div>
+      <div style="text-align:center;color:var(--faint);font-size:13px">— or —</div>
+      <div>
+        <label class="field">Import a browser bookmarks file</label>
+        <p style="color:var(--muted);font-size:13px;margin:0 0 8px">In Chrome/Edge: Bookmarks → Bookmark manager → ⋮ → <b>Export bookmarks</b>. Then drop the <span class="mono">.html</span> file here.</p>
+        <input type="file" id="imp-file" accept=".html,.htm">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="doImport">Add to Inbox</button>
+    </div>
+  </div>
+</div>
+
+<!-- Review overlay -->
+<div class="overlay" id="reviewOverlay">
+  <div class="review-shell">
+    <div class="review-progress"><i id="rev-bar" style="width:0%"></i></div>
+    <div class="review-card" id="rev-card"></div>
+    <div class="review-nav">
+      <button class="btn ghost sm" id="rev-skip">Skip for now →</button>
+      <button class="btn ghost sm" data-close>Close review</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /appShell -->
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="./app.js"></script>

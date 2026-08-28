@@ -5,8 +5,8 @@
   "description": "Save, sync and triage links, reading list, and tab sessions — with two-way Chrome bookmark sync.",
   "permissions": ["bookmarks", "tabs", "tabGroups", "storage", "alarms"],
   "host_permissions": [
-    "https://YOUR-DOMAIN.com/*",
-    "https://signal-desk-api.onrender.com/*"
+    "https://signal-desk.darkrumi.in/*",
+    "https://signal-desk-api-h6fn.onrender.com/*"
   ],
   "background": { "service_worker": "background.js", "type": "module" },
   "action": { "default_popup": "popup.html", "default_title": "Signal Desk" },

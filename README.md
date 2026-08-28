@@ -17,10 +17,10 @@ It's a **runnable backend**, a **working extension skeleton**, and a **precise s
 ### What already works (verified)
 - **Backend**: signup / login / refresh (rotating tokens) + **rev-based delta sync** with **last-write-wins** and tombstones. Tested end-to-end against Postgres. `render.yaml` deploys it as-is (`alembic upgrade head` builds the schema on first boot).
 - **Extension**: MV3 manifest + service worker + entity-sync engine + **two-way bookmark engine** (both directions + echo-suppression implemented; a few reconciliation edge cases are marked `TODO`) + popup + options. All JS passes `node --check`.
-- **Web app**: the existing single-file Signal Desk UI ships in `web/legacy-localstorage-ui.html` (localStorage version). `docs/` + `web/api-client.js` show exactly how to point it at the API and add the auth gate + a Sessions view.
+- **Web app**: live in `backend/app/static/`, served same-origin at `/`. Login/signup gate, IndexedDB cache for offline, a **Groups** (tab sessions) view, and every original bucket/review/playbook feature. Verified end-to-end in headless Chromium (`backend/tests/web_e2e.py`), two browser contexts on one account.
 
-### What the agent still builds
-Adapting the web UI to the API (auth gate + sync client + Sessions view), hardening the bookmark reconciliation edge cases, tests, and Chrome Web Store packaging. See `docs/ROADMAP.md`.
+### What's still to build
+Wiring the extension to the deployed API (M4–M5), hardening the bookmark reconciliation edge cases (M6), a backend pytest suite, and Chrome Web Store packaging. See `docs/ROADMAP.md`.
 
 ---
 
