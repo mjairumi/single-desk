@@ -111,7 +111,9 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 - Health: <http://localhost:8000/api/health> → `{"ok":true}`
-- Swagger: <http://localhost:8000/docs>
+- Swagger: <http://localhost:8000/docs> — only because `backend/.env` sets
+  `ENABLE_DOCS="true"`. The code default is **off**, so a deployment never
+  publishes `/docs`, `/redoc`, or `/openapi.json` unless someone opts in.
 
 ## 7. Verify end to end
 

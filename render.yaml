@@ -61,5 +61,8 @@ services:
         # You won't know the extension id until you load it once — see docs/DEPLOY.md,
         # then edit this value in the Render dashboard (no redeploy of code needed).
         value: "https://signal-desk.darkrumi.in,https://signal-desk-api-h6fn.onrender.com,chrome-extension://REPLACE_WITH_EXTENSION_ID"
+      - key: ENABLE_DOCS
+        # Interactive docs (/docs, /redoc, /openapi.json) off in production.
+        value: "false"
       - key: PYTHON_VERSION
         value: "3.12.6"

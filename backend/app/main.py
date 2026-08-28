@@ -5,6 +5,11 @@ Serves:
   • the static web app (Signal Desk SPA) for everything else, so the web app
     and API share one origin (simplest CORS/auth story). The extension is a
     separate origin and is allowed via CORS_ORIGINS.
+
+The interactive docs (/docs, /redoc, /openapi.json) are DISABLED unless
+ENABLE_DOCS is set. They describe every endpoint and schema, which is free
+reconnaissance on a public deployment, so production leaves them off and local
+development opts in via .env.
 """
 from __future__ import annotations
 
@@ -19,7 +24,16 @@ from .routers import auth as auth_router
 from .routers import sync as sync_router
 
 settings = get_settings()
-app = FastAPI(title="Signal Desk API")
+
+# All three must be disabled together: /docs and /redoc are just renderers for
+# openapi_url, so leaving the schema reachable would defeat the point.
+_docs = settings.ENABLE_DOCS
+app = FastAPI(
+    title="Signal Desk API",
+    docs_url="/docs" if _docs else None,
+    redoc_url="/redoc" if _docs else None,
+    openapi_url="/openapi.json" if _docs else None,
+)
 
 app.add_middleware(
     CORSMiddleware,

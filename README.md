@@ -51,7 +51,8 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
-# API docs at http://localhost:8000/docs ; health at /api/health
+# Web app + API at http://localhost:8000 ; health at /api/health
+# Swagger at /docs (local only — ENABLE_DOCS defaults to off)
 
 # 3. Verify
 BASE=http://127.0.0.1:8000 python tests/manual_smoke.py   # -> SMOKE OK

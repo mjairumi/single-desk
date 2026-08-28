@@ -1,6 +1,6 @@
 # API contract
 
-Base: `https://<your-domain>` (web app is same-origin; extension is cross-origin, allow-listed via `CORS_ORIGINS`). All bodies are JSON. Auth is `Authorization: Bearer <access_token>`. Interactive docs auto-generated at `/docs`.
+Base: `https://<your-domain>` (web app is same-origin; extension is cross-origin, allow-listed via `CORS_ORIGINS`). All bodies are JSON. Auth is `Authorization: Bearer <access_token>`. Interactive docs (`/docs`, `/redoc`, `/openapi.json`) are **disabled unless `ENABLE_DOCS` is set** — production leaves them off so the API surface isn't published; enable them locally via `backend/.env`.
 
 Timestamps are ISO-8601 with timezone (e.g. `2026-08-28T16:45:35.065485+00:00`).
 

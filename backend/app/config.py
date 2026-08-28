@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_TTL_MIN: int = 15
     REFRESH_TOKEN_TTL_DAYS: int = 30
     CORS_ORIGINS: str = "http://localhost:5173"
+    # Interactive API docs (/docs, /redoc, /openapi.json). OFF by default so a
+    # public deployment never exposes the API surface by accident; switch it on
+    # explicitly for local development.
+    ENABLE_DOCS: bool = False
 
     @property
     def database_url(self) -> str:
