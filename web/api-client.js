@@ -1,0 +1,124 @@
+// Signal Desk web client: Auth + IndexedDB cache + SyncClient.
+// Import as an ES module from the web app. The legacy UI's load()/save() get
+// replaced by Store + SyncClient (see web/README.md). No framework required.
+//
+// API base: when the web app is served by the FastAPI service it's same-origin,
+// so default to window.location.origin.
+
+const API_BASE = (window.SIGNALDESK_API || window.location.origin).replace(/\/$/, "");
+
+// ---------- tokens ----------
+let accessToken = null; // kept in memory
+const REFRESH_KEY = "signaldesk.refresh";
+function getRefresh() { try { return localStorage.getItem(REFRESH_KEY); } catch { return null; } }
+function setTokens(t) { accessToken = t.access_token; try { localStorage.setItem(REFRESH_KEY, t.refresh_token); } catch {} }
+function clearTokens() { accessToken = null; try { localStorage.removeItem(REFRESH_KEY); } catch {} }
+export function isLoggedIn() { return !!getRefresh(); }
+
+async function raw(path, { method = "GET", body, token } = {}) {
+  return fetch(API_BASE + path, {
+    method,
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+    body: body != null ? JSON.stringify(body) : undefined,
+  });
+}
+
+export const Auth = {
+  async signup(email, password, displayName) {
+    const r = await raw("/api/auth/signup", { method: "POST", body: { email, password, display_name: displayName } });
+    if (!r.ok) throw new Error((await r.json()).detail || "Signup failed");
+    setTokens(await r.json());
+  },
+  async login(email, password) {
+    const r = await raw("/api/auth/login", { method: "POST", body: { email, password } });
+    if (!r.ok) throw new Error((await r.json()).detail || "Login failed");
+    setTokens(await r.json());
+  },
+  async logout() {
+    const rt = getRefresh();
+    if (rt) await raw("/api/auth/logout", { method: "POST", body: { refresh_token: rt } });
+    clearTokens();
+  },
+  async ensureAccess() {
+    if (accessToken) return accessToken;
+    const rt = getRefresh();
+    if (!rt) throw new Error("not logged in");
+    const r = await raw("/api/auth/refresh", { method: "POST", body: { refresh_token: rt } });
+    if (!r.ok) { clearTokens(); throw new Error("session expired"); }
+    setTokens(await r.json());
+    return accessToken;
+  },
+};
+
+async function apiFetch(path, opts = {}) {
+  let token = await Auth.ensureAccess();
+  let r = await raw(path, { ...opts, token });
+  if (r.status === 401) { token = await Auth.ensureAccess(); r = await raw(path, { ...opts, token }); }
+  if (!r.ok) throw new Error(`${opts.method || "GET"} ${path} → ${r.status}`);
+  return r.status === 204 ? null : r.json();
+}
+
+// ---------- IndexedDB cache ----------
+const DB = "signaldesk-web", VER = 1;
+function open() {
+  return new Promise((res, rej) => {
+    const q = indexedDB.open(DB, VER);
+    q.onupgradeneeded = () => { const db = q.result;
+      for (const s of ["items", "sessions"]) if (!db.objectStoreNames.contains(s)) db.createObjectStore(s, { keyPath: "id" });
+      if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "k" });
+    };
+    q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+  });
+}
+function done(req) { return new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); }
+
+export const Store = {
+  async all(store) { const db = await open(); return done(db.transaction(store).objectStore(store).getAll()); },
+  async put(store, row) { const db = await open(); return done(db.transaction(store, "readwrite").objectStore(store).put(row)); },
+  async get(store, id) { const db = await open(); return done(db.transaction(store).objectStore(store).get(id)); },
+  async meta(k, d = null) { const db = await open(); const r = await done(db.transaction("meta").objectStore("meta").get(k)); return r ? r.v : d; },
+  async setMeta(k, v) { const db = await open(); return done(db.transaction("meta", "readwrite").objectStore("meta").put({ k, v })); },
+};
+
+const ITEM_FIELDS = ["id","url","title","note","tags","bucket","cadence_days","last_visited","shelf_days","added_at","archived_at","snoozed_until","deleted","updated_at"];
+const SESSION_FIELDS = ["id","name","tabs","deleted","updated_at"];
+const pick = (r, f) => Object.fromEntries(f.map((k) => [k, r[k] ?? (k === "tags" ? [] : null)]));
+
+// ---------- local mutations (call these from the UI) ----------
+export async function upsertItem(partial) {
+  const now = new Date().toISOString();
+  const existing = partial.id ? await Store.get("items", partial.id) : null;
+  const row = { id: partial.id || crypto.randomUUID(), added_at: now, tags: [], note: "", title: "", url: null, bucket: "inbox", deleted: false,
+    ...(existing || {}), ...partial, updated_at: now, _dirty: true };
+  await Store.put("items", row); return row;
+}
+export const deleteItem = (id) => upsertItem({ id, deleted: true });
+export async function upsertSession(partial) {
+  const now = new Date().toISOString();
+  const existing = partial.id ? await Store.get("sessions", partial.id) : null;
+  const row = { id: partial.id || crypto.randomUUID(), name: "", tabs: [], deleted: false, ...(existing || {}), ...partial, updated_at: now, _dirty: true };
+  await Store.put("sessions", row); return row;
+}
+
+// ---------- sync ----------
+async function applyServer(res) {
+  for (const it of res.items || []) await Store.put("items", { ...it, _dirty: false });
+  for (const s of res.sessions || []) await Store.put("sessions", { ...s, _dirty: false });
+  if (typeof res.server_rev === "number") await Store.setMeta("since_rev", res.server_rev);
+}
+
+export async function syncNow() {
+  if (!isLoggedIn()) return;
+  const dirtyItems = (await Store.all("items")).filter((r) => r._dirty);
+  const dirtySessions = (await Store.all("sessions")).filter((r) => r._dirty);
+  if (dirtyItems.length || dirtySessions.length) {
+    const res = await apiFetch("/api/sync", { method: "POST", body: { items: dirtyItems.map((r) => pick(r, ITEM_FIELDS)), sessions: dirtySessions.map((r) => pick(r, SESSION_FIELDS)) } });
+    await applyServer(res);
+  }
+  const since = await Store.meta("since_rev", 0);
+  await applyServer(await apiFetch(`/api/sync?since_rev=${since}`));
+}
+
+// Convenience for the UI: the non-deleted items/sessions to render.
+export async function liveItems() { return (await Store.all("items")).filter((r) => !r.deleted); }
+export async function liveSessions() { return (await Store.all("sessions")).filter((r) => !r.deleted); }

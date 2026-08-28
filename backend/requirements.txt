@@ -1,0 +1,12 @@
+fastapi>=0.111
+uvicorn[standard]>=0.30
+gunicorn>=22.0
+SQLAlchemy>=2.0
+psycopg[binary]>=3.1          # psycopg 3 — driver used as postgresql+psycopg://
+alembic>=1.13
+pydantic>=2.7
+pydantic-settings>=2.3
+PyJWT>=2.8
+bcrypt>=4.1                   # password hashing (used directly; passlib is unmaintained)
+python-multipart>=0.0.9       # form parsing for login
+email-validator>=2.1          # EmailStr validation

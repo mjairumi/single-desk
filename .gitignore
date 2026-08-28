@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Env / secrets — never commit real credentials.
+# `.env` (local) and `.env.production` (Neon) stay on your machine only.
+.env
+.env.*
+!.env.example
+*.local
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Node (if you add a web build step later)
+node_modules/
+dist/
