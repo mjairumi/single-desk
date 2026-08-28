@@ -9,6 +9,7 @@ const API_BASE = (window.SIGNALDESK_API || window.location.origin).replace(/\/$/
 
 // ---------- tokens ----------
 let accessToken = null; // kept in memory
+let refreshing = null;  // in-flight token refresh, shared by concurrent callers
 const REFRESH_KEY = "signaldesk.refresh";
 function getRefresh() { try { return localStorage.getItem(REFRESH_KEY); } catch { return null; } }
 function setTokens(t) { accessToken = t.access_token; try { localStorage.setItem(REFRESH_KEY, t.refresh_token); } catch {} }
@@ -39,14 +40,21 @@ export const Auth = {
     if (rt) await raw("/api/auth/logout", { method: "POST", body: { refresh_token: rt } });
     clearTokens();
   },
+  // Refresh tokens ROTATE: the presented one is revoked as it is exchanged, so
+  // two concurrent refreshes would race and the loser would kill a good session.
+  // Collapse them onto a single in-flight promise.
   async ensureAccess() {
     if (accessToken) return accessToken;
+    if (refreshing) return refreshing;
     const rt = getRefresh();
     if (!rt) throw new Error("not logged in");
-    const r = await raw("/api/auth/refresh", { method: "POST", body: { refresh_token: rt } });
-    if (!r.ok) { clearTokens(); throw new Error("session expired"); }
-    setTokens(await r.json());
-    return accessToken;
+    refreshing = (async () => {
+      const r = await raw("/api/auth/refresh", { method: "POST", body: { refresh_token: rt } });
+      if (!r.ok) { clearTokens(); throw new Error("session expired"); }
+      setTokens(await r.json());
+      return accessToken;
+    })().finally(() => { refreshing = null; });
+    return refreshing;
   },
 };
 
@@ -103,10 +111,28 @@ export async function upsertSession(partial) {
 }
 
 // ---------- sync ----------
-async function applyServer(res) {
-  for (const it of res.items || []) await Store.put("items", { ...it, _dirty: false });
-  for (const s of res.sessions || []) await Store.put("sessions", { ...s, _dirty: false });
-  if (typeof res.server_rev === "number") await Store.setMeta("since_rev", res.server_rev);
+const at = (v) => { const t = Date.parse(v); return Number.isNaN(t) ? 0 : t; };
+
+async function applyRows(store, rows, fromPush) {
+  for (const row of rows) {
+    if (fromPush) {
+      // Edited again locally while the push was in flight? Keep the newer local
+      // copy dirty rather than clobbering it with our own echo.
+      const local = await Store.get(store, row.id);
+      if (local && local._dirty && at(local.updated_at) > at(row.updated_at)) continue;
+    }
+    await Store.put(store, { ...row, _dirty: false });
+  }
+}
+
+async function applyServer(res, { fromPush = false } = {}) {
+  await applyRows("items", res.items || [], fromPush);
+  await applyRows("sessions", res.sessions || [], fromPush);
+  // The cursor may ONLY advance from a pull. A push response contains just the
+  // entities we sent, but its server_rev counts every write the server has
+  // accepted — including other devices'. Adopting it as the cursor would skip
+  // those revisions permanently: they would never be pulled again.
+  if (!fromPush && typeof res.server_rev === "number") await Store.setMeta("since_rev", res.server_rev);
 }
 
 export async function syncNow() {
@@ -115,7 +141,7 @@ export async function syncNow() {
   const dirtySessions = (await Store.all("sessions")).filter((r) => r._dirty);
   if (dirtyItems.length || dirtySessions.length) {
     const res = await apiFetch("/api/sync", { method: "POST", body: { items: dirtyItems.map((r) => pick(r, ITEM_FIELDS)), sessions: dirtySessions.map((r) => pick(r, SESSION_FIELDS)) } });
-    await applyServer(res);
+    await applyServer(res, { fromPush: true });
   }
   const since = await Store.meta("since_rev", 0);
   await applyServer(await apiFetch(`/api/sync?since_rev=${since}`));

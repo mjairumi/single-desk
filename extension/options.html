@@ -54,7 +54,13 @@
       <button class="ghost" id="syncNow">Sync now</button>
       <button class="ghost" id="rebuild">Rebuild bookmark mirror</button>
     </div>
-    <p class="muted" style="margin-top:10px">Two-way bookmark sync mirrors a folder named <b>Signal Desk</b> under “Other Bookmarks”. Only that subtree is touched.</p>
+
+    <label style="display:flex;align-items:center;gap:9px;margin-top:16px;font-size:13px;font-weight:600;color:var(--ink)">
+      <input type="checkbox" id="mirrorBookmarks" style="width:auto;margin:0">
+      Mirror items to Chrome bookmarks (experimental)
+    </label>
+    <p class="muted" style="margin-top:6px">Two-way bookmark sync mirrors a folder named <b>Signal Desk</b> under “Other Bookmarks”. Only that subtree is ever touched.
+      <b>Off by default</b> while its reconciliation edge cases are unfinished — capturing tabs, saving sessions and syncing all work without it.</p>
   </div>
 
   <p id="status" class="muted"></p>

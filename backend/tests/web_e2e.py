@@ -13,8 +13,29 @@ Run it against a LOCAL server -- it signs up throwaway accounts:
     uvicorn app.main:app --port 8000     # terminal 1
     python tests/web_e2e.py             # terminal 2
 """
-import os, sys, uuid
+import datetime as dt
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+import uuid
+
 from playwright.sync_api import sync_playwright
+
+
+def api(method, path, body=None, token=None):
+    """Talk to the API directly, standing in for a second device."""
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(BASE + path, data=data, method=method)
+    req.add_header("Content-Type", "application/json")
+    if token:
+        req.add_header("Authorization", "Bearer " + token)
+    try:
+        with urllib.request.urlopen(req) as r:
+            return r.status, json.loads(r.read() or "null")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode()
 
 BASE = os.environ.get("BASE", "http://127.0.0.1:8000")
 EMAIL = f"web+{uuid.uuid4().hex[:8]}@example.com"
@@ -172,7 +193,50 @@ with sync_playwright() as p:
     pa.wait_for_selector("#authGate", state="visible", timeout=10000)
     check("logout returns to the auth gate", pa.is_hidden("#appShell"))
 
-    real_errors = [e for e in (ea + eb) if "favicon" not in e.lower()]
+    # ---------- regression: the sync cursor may only advance on a PULL --------
+    # A client holding BOTH local dirty rows and unpulled remote changes must not
+    # skip the remote ones. Advancing the cursor from the push response (whose
+    # server_rev counts every write the server accepted, including other
+    # devices') made those revisions unreachable forever.
+    email2 = f"cursor+{uuid.uuid4().hex[:8]}@example.com"
+    st, tok = api("POST", "/api/auth/signup", {"email": email2, "password": PW})
+    assert st == 200, tok
+    token = tok["access_token"]
+
+    pc = br.new_context().new_page()
+    ec = errors_of(pc)
+    pc.goto(BASE)
+    pc.wait_for_selector("#authGate", state="visible", timeout=10000)
+    pc.fill("#authEmail", email2)
+    pc.fill("#authPassword", PW)
+    pc.click("#authSubmit")
+    pc.wait_for_selector("#appShell", state="visible", timeout=15000)
+    pc.wait_for_timeout(1500)   # initial sync: cursor is now caught up
+
+    # A different device writes three items straight to the API.
+    now = dt.datetime.now(dt.timezone.utc).isoformat()
+    others = [
+        {"id": str(uuid.uuid4()), "url": f"https://other/{i}", "title": f"from-other-{i}",
+         "bucket": "library", "tags": [], "added_at": now, "updated_at": now}
+        for i in range(3)
+    ]
+    st, _ = api("POST", "/api/sync", {"items": others, "sessions": []}, token)
+    assert st == 200
+
+    # This page now creates a local edit and syncs exactly once, so the single
+    # syncNow() call performs a push AND a pull.
+    got = pc.evaluate("""async () => {
+      const m = await import('/api-client.js');
+      await m.upsertItem({ url: 'https://local/one', title: 'local-edit', bucket: 'library' });
+      await m.syncNow();
+      const rows = await m.liveItems();
+      return rows.map(r => r.title).sort();
+    }""")
+    expected = sorted(["local-edit", "from-other-0", "from-other-1", "from-other-2"])
+    check("push+pull in one sync keeps the other device's changes", got == expected,
+          extra=f"got {got}")
+
+    real_errors = [e for e in (ea + eb + ec) if "favicon" not in e.lower()]
     check("no console/page errors", not real_errors, extra=str(real_errors[:3]))
 
     br.close()

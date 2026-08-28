@@ -9,6 +9,17 @@ MV3. A service worker (`background.js`) runs the sync loop on an alarm, reacts t
 
 ## Two-way bookmark sync
 
+> **Ships disabled.** `mirrorBookmarks` in `lib/config.js` defaults to `false`,
+> with a toggle in Options. The `on*` handlers and `applyItemsToChrome` are
+> skipped entirely while it's off, so a half-finished mirror can't invent or
+> tombstone items. Everything below describes the engine as designed; turn the
+> flag on to work on M6, and see `docs/EXTENSION_TESTING.md` § M6 for the pass.
+>
+> The specific reason it's off: after `chrome.bookmarks.create` resolves we add
+> the new id to the suppression set and record the mapping — but `onCreated` can
+> fire *before* either happens, and the handler's only guard is that mapping. Our
+> own new bookmark can therefore be adopted as a second item.
+
 ### The managed subtree
 We own exactly one bookmark folder: **`Other Bookmarks → Signal Desk`**, with one child folder per **mirrored bucket** (`inbox, library, rounds, queue, explore` — **Archive is not mirrored**; it's a hospice). Every Signal Desk item with a `url` in a mirrored bucket maps to exactly one bookmark node in the matching bucket folder. **Nothing outside this subtree is ever touched.**
 
