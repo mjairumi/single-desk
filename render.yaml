@@ -15,10 +15,8 @@
 #     at https://render.com/pricing before applying.
 # ---------------------------------------------------------------------------
 
-databases:
-  - name: signal-desk-db
-    plan: free                 # ⇦ change to e.g. basic-256mb so the DB persists
-    postgresMajorVersion: "16"
+# No `databases:` block — the database is Neon, provisioned outside Render.
+# Set DATABASE_URL in the Render dashboard (see the envVars note below).
 
 services:
   - type: web
@@ -36,9 +34,14 @@ services:
     autoDeploy: true
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: signal-desk-db
-          property: connectionString
+        # Neon connection string. `sync: false` means Render PROMPTS for this on
+        # first apply and stores it as a secret — it is deliberately NOT written
+        # here, because this file is public in git.
+        # Paste the pooled URI from the Neon console (Connect → Connection string):
+        #   postgresql://<user>:<password>@<endpoint>-pooler.<region>.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+        # app/config.py rewrites the scheme to postgresql+psycopg:// and preserves
+        # the query parameters.
+        sync: false
       - key: SECRET_KEY              # signs JWTs — Render generates a strong random value
         generateValue: true
       - key: ACCESS_TOKEN_TTL_MIN

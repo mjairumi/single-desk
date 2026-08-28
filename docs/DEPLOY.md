@@ -7,8 +7,13 @@ Put this repo on GitHub/GitLab/Bitbucket.
 
 ## 2. Create the Blueprint
 Render Dashboard → **New +** → **Blueprint** → pick the repo → **Apply**. Render reads `render.yaml` and creates:
-- **`signal-desk-db`** — a Postgres database.
-- **`signal-desk-api`** — the FastAPI web service. On boot it runs `alembic upgrade head` (builds the schema from `0001_init`) then starts Gunicorn/Uvicorn. `DATABASE_URL` and `SECRET_KEY` are injected automatically.
+- **`signal-desk-api`** — the FastAPI web service. On boot it runs `alembic upgrade head` (builds the schema from `0001_init`) then starts Gunicorn/Uvicorn. `SECRET_KEY` is generated automatically.
+
+The **database is Neon**, provisioned outside Render, so `render.yaml` has no
+`databases:` block. `DATABASE_URL` is declared `sync: false`, which makes Render
+prompt you for it on first apply and store it as a secret — the connection
+string is never written into the repo. Paste the pooled URI from the Neon
+console (**Connect → Connection string**); keep `?sslmode=require`.
 
 Watch the deploy log; when `GET /api/health` returns `{"ok":true}` you're live at `https://signal-desk-api.onrender.com`.
 

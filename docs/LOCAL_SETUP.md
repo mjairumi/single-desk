@@ -178,10 +178,9 @@ python -c "from app.config import Settings; u=Settings().database_url; print(u.s
 
 Two things to keep in mind:
 
-- **`render.yaml` still declares its own Render Postgres** (`signal-desk-db`).
-  If you deploy on Render but use Neon as the database, delete the `databases:`
-  block and the `fromDatabase:` mapping for `DATABASE_URL`, and set
-  `DATABASE_URL` as a plain (secret) env var pointing at Neon instead.
+- **`render.yaml` has no `databases:` block** — Neon is the database. Its
+  `DATABASE_URL` is declared `sync: false`, so Render prompts for the value on
+  first apply and stores it as a secret rather than keeping it in the repo.
 - Neon's connection string carries `?sslmode=require&channel_binding=require`.
   `app/config.py` only rewrites the scheme prefix, so those query parameters
   survive into the psycopg driver untouched.
