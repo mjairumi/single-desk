@@ -18,11 +18,12 @@ signup / login / refresh (rotating) / logout / me.
 Login/signup gate + IndexedDB cache (offline) + a **Groups** (tab sessions) view, served from FastAPI at `backend/app/static/`. Every bucket/review/playbook feature carried over; entities are held in the API's own snake_case + ISO-8601 shape.
 **Check:** passes — `backend/tests/web_e2e.py` drives headless Chromium through signup, add/edit/delete, reload persistence, and two browser contexts on one account converging in both directions (tombstones included).
 
-## M4 — Extension: capture + auth + entity sync  ⟵ start here
-Wire Options login, popup quick-capture, and the alarm sync loop (`sync.js`). No bookmarks yet.
-**Check:** capture a tab in the extension → it appears in the web app (and vice-versa) within one sync interval.
+## M4 — Extension: capture + auth + entity sync ✅
+Options login, popup quick-capture and the alarm sync loop. Bookmark mirroring is gated behind a config flag (off) so M4/M5 don't depend on the unfinished M6 engine.
+Fixed while wiring it: the sync cursor was advanced from the **push** response in both clients, which made a device permanently skip revisions written by another device; concurrent token refreshes could revoke a live session; and the popup reported "Saved ✓" even when the push had failed.
+**Check:** passes — see `docs/EXTENSION_TESTING.md` § M4. The cursor case is also covered automatically in `backend/tests/web_e2e.py`.
 
-## M5 — Tab sessions
+## M5 — Tab sessions  ⟵ start here
 Popup "Save this window as a session" + restore (`sessions.js`), list in web app.
 **Check:** save a window with a couple of tab groups → restore in a fresh window recreates tabs (and groups, best-effort).
 
@@ -40,4 +41,4 @@ Rate-limiting + email verification (`docs/AUTH.md` backlog), backups, Chrome Web
 ---
 ### Suggested test scaffolding
 - `backend/tests/` — pytest + httpx `TestClient`, a throwaway Postgres (or `testcontainers`), covering auth + sync + LWW + tombstones.
-- `extension/` — a short manual test checklist per milestone (M4–M6) in `docs/`, since MV3 e2e is heavy; optionally Playwright with a loaded unpacked extension later.
+- `extension/` — `docs/EXTENSION_TESTING.md` carries the per-milestone manual checklist (M4–M6), since MV3 e2e is heavy; optionally Playwright with a loaded unpacked extension later.

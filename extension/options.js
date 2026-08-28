@@ -20,7 +20,14 @@ async function init() {
   const cfg = await getConfig();
   $("apiBase").value = cfg.apiBase;
 
+  $("mirrorBookmarks").checked = cfg.mirrorBookmarks === true;
   $("saveServer").onclick = async () => { await setConfig({ apiBase: $("apiBase").value.trim() }); status("Server settings saved ✓"); };
+  $("mirrorBookmarks").onchange = async () => {
+    await setConfig({ mirrorBookmarks: $("mirrorBookmarks").checked });
+    status($("mirrorBookmarks").checked
+      ? "Bookmark mirroring ON — reload the extension, then use “Rebuild bookmark mirror”."
+      : "Bookmark mirroring OFF. Capture and sync are unaffected.");
+  };
 
   $("tabLogin").onclick = () => setMode("login");
   $("tabSignup").onclick = () => setMode("signup");
@@ -37,8 +44,17 @@ async function init() {
     } catch (e) { status(e.message, false); }
   };
   $("logout").onclick = async () => { await logout(); status("Logged out"); refreshAuthUI(); };
-  $("syncNow").onclick = async () => { status("Syncing…"); const r = await chrome.runtime.sendMessage({ type: "sync-now" }); status(r?.ok ? "Synced ✓" : "Sync error", !!r?.ok); };
-  $("rebuild").onclick = async () => { status("Rebuilding mirror…"); const r = await chrome.runtime.sendMessage({ type: "rebuild-mirror" }); status(r?.ok ? "Mirror rebuilt ✓" : "Error", !!r?.ok); };
+  $("syncNow").onclick = async () => {
+    status("Syncing…");
+    const r = await chrome.runtime.sendMessage({ type: "sync-now" });
+    status(r?.ok ? (r.changed ? `Synced ✓ ${r.changed} change${r.changed === 1 ? "" : "s"}` : "Synced ✓ up to date")
+                 : "Sync error: " + (r?.error || "unknown"), !!r?.ok);
+  };
+  $("rebuild").onclick = async () => {
+    status("Rebuilding mirror…");
+    const r = await chrome.runtime.sendMessage({ type: "rebuild-mirror" });
+    status(r?.ok ? "Mirror rebuilt ✓" : "Error: " + (r?.error || "unknown"), !!r?.ok);
+  };
 
   await refreshAuthUI();
 }

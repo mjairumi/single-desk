@@ -6,6 +6,11 @@ export const DEFAULTS = {
   // mirrored (it's a hospice — see docs/EXTENSION.md).
   mirroredBuckets: ["inbox", "library", "rounds", "queue", "explore"],
   syncIntervalMin: 2,
+  // Two-way Chrome bookmark mirroring (M6). OFF until the reconciliation edge
+  // cases in lib/bookmarks.js are resolved — the create path can still race its
+  // own onCreated echo and adopt a bookmark we just made as a second item.
+  // Capture, sessions and entity sync (M4/M5) do not depend on it.
+  mirrorBookmarks: false,
 };
 
 export async function getConfig() {
