@@ -27,6 +27,8 @@ Because ids are **client-generated UUIDs**, a device can create entities offline
 - Store rows locally (IndexedDB) in the same shape the API uses, plus a transient `_dirty` flag.
 - On any local edit: set `updated_at = now`, `_dirty = true`.
 - Sync loop: **push** dirty rows → apply the returned canonical rows (clearing `_dirty`) → **pull** `?since_rev=cursor` → apply → advance cursor. Run on an interval, debounced after edits, and on reconnect.
+- **Advance the cursor only from a pull.** The push response also carries a `server_rev`, but it is the server's *global* clock — it counts writes from every device, while the response body contains only the entities you sent. Adopting it as your cursor silently skips every revision another device wrote in between, and those rows are then never pulled again. (Both clients had this bug; `backend/tests/web_e2e.py` now guards it.)
+- **Don't let a push echo clobber a newer local edit.** If a row was edited again while its push was in flight, keep the local copy and leave it `_dirty`; compare parsed timestamps, not ISO strings, since the server returns `+00:00` where clients send `Z`.
 - Treat a returned row with a newer `updated_at` than your local edit as "you lost the conflict" — take the server's version. (Optionally surface a toast; conflicts are rare for a single user across their own devices.)
 
 ## Edge cases & choices
