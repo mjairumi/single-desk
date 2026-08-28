@@ -23,7 +23,13 @@ services:
     name: signal-desk-api
     runtime: python
     plan: free                 # ⇦ change to `starter` to avoid idle spin-down
-    region: oregon             # oregon | ohio | virginia | frankfurt | singapore — pick the closest
+    # Put the service in the SAME region as the Neon database. The Neon endpoint
+    # is ap-southeast-1 (Singapore); measured round-trip from a co-located client
+    # is ~75 ms, and each /api/sync write costs several round trips (row lock +
+    # flush + commit + clock re-read). Running this in Oregon against a Singapore
+    # database roughly triples the latency of every write.
+    # Options: oregon | ohio | virginia | frankfurt | singapore
+    region: singapore
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     # On PAID plans, prefer running migrations in preDeployCommand (keeps startup clean):
