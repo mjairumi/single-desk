@@ -33,6 +33,7 @@ Opaque refresh tokens, stored only as `token_hash` (sha256), rotated on use.
 | added_at | timestamptz | |
 | archived_at | timestamptz null | |
 | snoozed_until | timestamptz null | |
+| **topic** | text NULL | the catalog axis — see below. NULL = not catalogued yet |
 | **deleted** | bool | tombstone |
 | **rev** | bigint | `users.sync_rev` at last change; indexed with user_id |
 | **updated_at** | timestamptz | drives last-write-wins |
@@ -68,6 +69,25 @@ cost of a re-fetch.
 
 Written only by `POST /api/preview` (`app/routers/preview.py`); fetched by
 `app/preview.py`. Never appears in a sync payload.
+
+## The two axes on an item
+An item is filed on two independent axes, and keeping them separate is what
+stops the Library turning back into a pile.
+
+- **`bucket`** — the link's **job**: *when* you deal with it. Inbox, Library,
+  Rounds, Read-later, Explore, Archive. A lifecycle, one of a fixed set.
+- **`topic`** — what the link is **about**: its shelf. **Single-valued**, free
+  text, user-invented, NULL until catalogued.
+
+`topic` is single-valued on purpose, and that is the whole difference between it
+and `tags`. Tags are many-valued, so grouping by a tag duplicates an item into
+every group it half-belongs to and no group is its home — which is exactly why a
+tag list cannot act as a catalog. One topic per item means one decision, one
+home, and a grouped view with no duplicates. Items with no topic surface as an
+explicit "Uncatalogued" group rather than quietly vanishing into a default.
+
+Not to be confused with **`shelf_days`**, which is the Read-later expiry clock
+and has nothing to do with topics.
 
 ## The three sync fields (every syncable row)
 - **`rev`** — server-authoritative. The server increments `users.sync_rev` (under a row lock) once per accepted write and stamps it here. Clients pull `?since_rev=` and never set it.

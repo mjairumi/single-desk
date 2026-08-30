@@ -137,7 +137,10 @@ def describe(index: int, item: dict, preview: dict | None) -> dict:
         row["existing_note"] = item["note"][:200]
     if item.get("tags"):
         row["existing_tags"] = item["tags"][:6]
-    return {k: v for k, v in row.items() if v}
+    # Drop empty fields so the model isn't fed nulls — but test for emptiness,
+    # not falsiness: index 0 is a perfectly good index, and dropping it would
+    # silently strip the first item of every batch of its only identifier.
+    return {k: v for k, v in row.items() if v not in (None, "", [], {})}
 
 
 # ---------------------------------------------------------------------------

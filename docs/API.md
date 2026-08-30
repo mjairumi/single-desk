@@ -40,7 +40,7 @@ Returns every entity for the user with `rev > N`, **including tombstones** (`del
 ```json
 {
   "items": [ { "id":"...", "url":"https://…", "title":"…", "note":"", "tags":["x"],
-    "bucket":"library", "cadence_days":null, "last_visited":null, "shelf_days":null,
+    "bucket":"library", "topic":"Backend", "cadence_days":null, "last_visited":null, "shelf_days":null,
     "added_at":"…", "archived_at":null, "snoozed_until":null,
     "deleted":false, "updated_at":"…", "rev": 7 } ],
   "sessions": [ { "id":"...", "name":"Research", "tabs":[{"url":"…","title":"…"}],
@@ -55,7 +55,7 @@ Push local changes. Send the **full** entity (the server reads `updated_at` for 
 ```json
 {
   "items": [ { "id":"<uuid>", "url":"https://…", "title":"…", "tags":[],
-    "bucket":"inbox", "added_at":"…", "updated_at":"…", "deleted":false } ],
+    "bucket":"inbox", "topic":null, "added_at":"…", "updated_at":"…", "deleted":false } ],
   "sessions": [ { "id":"<uuid>", "name":"…", "tabs":[…], "updated_at":"…" } ]
 }
 ```
