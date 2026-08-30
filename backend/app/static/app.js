@@ -12,7 +12,7 @@
 // only ever one spelling of a field in this file.
 import {
   Auth, isLoggedIn, Store, upsertItem, deleteItem, upsertSession,
-  syncNow, liveItems, liveSessions,
+  syncNow, liveItems, liveSessions, loadPreviews, fetchPreviews,
 } from "./api-client.js";
 
 const DAY = 86400000;
@@ -312,6 +312,108 @@ function renderNav() {
   }).join("");
 }
 
+// ============================================================================
+// Link previews
+//
+// Triage is a glance-and-decide loop, so a card has to say what a link IS
+// before you can file it. The server fetches and caches the metadata
+// (app/preview.py); this side decides WHEN to ask and paints the answer in.
+//
+// Asking is lazy and viewport-driven: an IntersectionObserver queues the URL of
+// each card as it nears the screen, and the queue is flushed in debounced
+// batches. So a 400-item Library costs one request for the dozen rows you can
+// actually see, and nothing at all for the rest.
+//
+// Results are painted into the existing DOM rather than triggering a re-render:
+// a full render() would reset scroll position underneath someone mid-triage.
+// ============================================================================
+const previews = new Map();          // url (as the item holds it) -> preview row
+const previewPending = new Set();     // in flight — don't ask twice
+const previewQueue = new Set();       // seen on screen, not yet asked
+let previewTimer = null;
+let previewObserver = null;
+const PREVIEW_BATCH = 24;             // matches the server's per-request cap
+
+function previewOf(it) { return it && it.url ? previews.get(it.url) || null : null; }
+
+// A preview is only worth showing if it says something the card doesn't already.
+function usefulPreview(p) { return !!(p && p.status === "ok" && (p.description || p.image_url)); }
+
+function queuePreview(url) {
+  if (!url || previews.has(url) || previewPending.has(url)) return;
+  previewQueue.add(url);
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(flushPreviews, 120);
+}
+
+async function flushPreviews() {
+  const batch = [...previewQueue].slice(0, PREVIEW_BATCH);
+  if (!batch.length) return;
+  batch.forEach((u) => { previewQueue.delete(u); previewPending.add(u); });
+  try {
+    for (const row of await fetchPreviews(batch)) {
+      previews.set(row.key, row);
+      paintPreview(row);
+    }
+  } catch (e) {
+    // Offline, or the session expired mid-scroll. Previews are decoration:
+    // drop the batch and let the next render ask again.
+  } finally {
+    batch.forEach((u) => previewPending.delete(u));
+    if (previewQueue.size) { clearTimeout(previewTimer); previewTimer = setTimeout(flushPreviews, 120); }
+  }
+}
+
+// `referrerpolicy` keeps the sites you saved from learning which app is
+// rendering them; `loading=lazy` keeps a long list from opening 200 sockets.
+function favImg(p) {
+  return '<img src="' + esc(p.icon_url) + '" alt="" loading="lazy" referrerpolicy="no-referrer">';
+}
+
+function previewInner(p, thumbClass) {
+  if (!usefulPreview(p)) return "";
+  return (p.image_url ? '<img class="' + thumbClass + '" src="' + esc(p.image_url) +
+      '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "") +
+    (p.description ? '<div class="pv-desc">' + esc(p.description) + "</div>" : "");
+}
+
+// Fill one already-rendered card from a preview row.
+function applyPreview(el, p, thumbClass) {
+  const fav = el.querySelector(".fav");
+  if (fav && p.status === "ok" && p.icon_url && !fav.querySelector("img")) fav.innerHTML = favImg(p);
+  const slot = el.querySelector(".pv, .review-pv");
+  if (slot) slot.innerHTML = previewInner(p, thumbClass || "pv-thumb");
+  const title = el.querySelector("[data-pvtitle]");
+  if (title && p.status === "ok" && p.title) title.textContent = p.title;
+}
+
+function paintPreview(row) {
+  document.querySelectorAll("[data-purl]").forEach((el) => {
+    if (el.dataset.purl === row.key) applyPreview(el, row, el.dataset.pvthumb);
+  });
+}
+
+// Called after every render that emits cards. Cards whose preview is already
+// known are painted immediately (no flicker on re-render); the rest are handed
+// to the observer and fetched when they come into view.
+function observePreviews() {
+  if (!previewObserver && "IntersectionObserver" in window) {
+    previewObserver = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        previewObserver.unobserve(e.target);
+        queuePreview(e.target.dataset.purl);
+      }
+    }, { rootMargin: "400px" });   // start fetching just before they scroll in
+  }
+  document.querySelectorAll("#main [data-purl]").forEach((el) => {
+    const known = previews.get(el.dataset.purl);
+    if (known) applyPreview(el, known, el.dataset.pvthumb);
+    else if (previewObserver) previewObserver.observe(el);
+    else queuePreview(el.dataset.purl);   // no IO support: just ask
+  });
+}
+
 function itemCard(it, acts) {
   const tags = (it.tags || []).map((t) => '<span class="tag">' + esc(t) + "</span>").join("");
   let pills = "";
@@ -333,13 +435,24 @@ function itemCard(it, acts) {
     pills = '<span class="pill ok">✦ idea</span>';
   }
   if (snoozed(it)) pills += ' <span class="pill ok">Snoozed ' + fmtRel(ms(it.snoozed_until)) + "</span>";
-  return '<div class="item" data-id="' + it.id + '">' +
-    '<div class="fav">' + esc(initial(it)) + "</div>" +
+  // Items saved by the extension or bulk-imported often carry no title of their
+  // own, and a card reading "news.ycombinator.com" tells you nothing. Borrow
+  // the page's real title in that case — but never over a title you typed.
+  const p = previewOf(it);
+  const ownTitle = !!(it.title && it.title.trim());
+  const heading = !ownTitle && p && p.status === "ok" && p.title ? p.title : niceTitle(it);
+  const titleAttr = ownTitle ? "" : " data-pvtitle";
+
+  return '<div class="item" data-id="' + it.id + '"' +
+      (it.url ? ' data-purl="' + esc(it.url) + '"' : "") + ">" +
+    '<div class="fav" data-letter="' + esc(initial(it)) + '">' +
+      (p && p.status === "ok" && p.icon_url ? favImg(p) : esc(initial(it))) + "</div>" +
     '<div class="body">' +
       '<div class="title">' + (it.url
-        ? '<a href="' + esc(it.url) + '" target="_blank" rel="noopener noreferrer" data-act="open">' + esc(niceTitle(it)) + "</a>"
-        : esc(niceTitle(it))) + "</div>" +
+        ? '<a href="' + esc(it.url) + '" target="_blank" rel="noopener noreferrer" data-act="open"' + titleAttr + ">" + esc(heading) + "</a>"
+        : esc(heading)) + "</div>" +
       (it.url ? '<div class="url">' + esc(host(it.url)) + "</div>" : "") +
+      (it.url ? '<div class="pv">' + previewInner(p, "pv-thumb") + "</div>" : "") +
       (it.note ? '<div class="note">' + esc(it.note) + "</div>" : "") +
       '<div class="meta">' + pills + tags + "</div>" +
     "</div>" +
@@ -462,6 +575,7 @@ function renderBucket(b) {
     '<div class="section-title"><h2>' + BUCKET_LABEL[b] + '</h2><span class="sub">' + list0.length + " item" + (list0.length === 1 ? "" : "s") + "</span></div>" +
     '<p style="color:var(--muted);max-width:64ch;margin:-6px 0 18px">' + intro + "</p>" + head + list + "</section>";
   bind("#triage-here", "click", startReview);
+  observePreviews();
 }
 
 function renderLibrary() {
@@ -498,6 +612,7 @@ function renderLibrary() {
     n.focus();
     try { n.setSelectionRange(pos, pos); } catch (e) {}
   });
+  observePreviews();
 }
 
 function renderExplore() {
@@ -536,6 +651,7 @@ function renderExplore() {
     try { n.setSelectionRange(pos, pos); } catch (e) {}
   });
   bind("#expl-surprise", "click", surpriseExplore);
+  observePreviews();
 }
 
 function surpriseExplore() {
@@ -570,6 +686,7 @@ function renderArchive() {
     await afterMutation();
     toast("Cleared " + old.length + " aged-out link" + (old.length > 1 ? "s" : "") + ".");
   });
+  observePreviews();
 }
 
 // ---------- Groups (tab sessions) ----------
@@ -899,11 +1016,22 @@ function renderReview() {
   } else {
     acts = A("r-open", "↗ Visit", "primary") + A("r-snooze", "Snooze 2w") + A("r-retire", "Retire → Library") + A("r-discard", "Drop the round", "ghost danger");
   }
+  // The review screen is where "what even is this?" costs the most time, so it
+  // gets the full preview — and the next card's is fetched now, so advancing
+  // never waits on the network.
+  const pv = previewOf(it);
+  const ownTitle = !!(it.title && it.title.trim());
+  const heading = !ownTitle && pv && pv.status === "ok" && pv.title ? pv.title : niceTitle(it);
+  if (it.url) queuePreview(it.url);
+  const next = revList[revIdx + 1];
+  if (next && next.it.url) queuePreview(next.it.url);
+
   document.getElementById("rev-card").innerHTML =
     '<div class="review-reason">◆ ' + esc(cur.reason) + "</div>" +
-    '<div class="review-main">' +
-      '<div class="title">' + esc(niceTitle(it)) + "</div>" +
+    '<div class="review-main"' + (it.url ? ' data-purl="' + esc(it.url) + '" data-pvthumb="review-thumb"' : "") + ">" +
+      '<div class="title"' + (ownTitle ? "" : " data-pvtitle") + ">" + esc(heading) + "</div>" +
       '<div class="url">' + esc(it.url || "") + "</div>" +
+      (it.url ? '<div class="review-pv">' + previewInner(pv, "review-thumb") + "</div>" : "") +
       (it.note ? '<div class="note">' + esc(it.note) + "</div>" : "") +
       '<div class="review-rule"><h4>Before you keep it — the honest test</h4><ol>' +
         "<li><b>Re-find test.</b> If you needed this next week, could you find it again in two minutes of search? If yes, you don’t need to store it. Let it go.</li>" +
@@ -1054,6 +1182,18 @@ function closeOverlays() {
 function wireStaticHandlers() {
   main = document.getElementById("main");
 
+  // Preview images come from other people's servers and some of them 404 or
+  // hotlink-block. A favicon that fails falls back to the letter square it
+  // replaced; a thumbnail that fails just leaves. `error` doesn't bubble, so
+  // this listens in the capture phase.
+  document.addEventListener("error", (e) => {
+    const img = e.target;
+    if (!img || img.tagName !== "IMG") return;
+    const fav = img.closest(".fav");
+    if (fav) { fav.textContent = fav.dataset.letter || "?"; return; }
+    if (img.classList.contains("pv-thumb") || img.classList.contains("review-thumb")) img.remove();
+  }, true);
+
   main.addEventListener("click", (e) => {
     const b = e.target.closest("[data-act]");
     if (b) {
@@ -1136,6 +1276,9 @@ async function boot() {
   if (!isLoggedIn()) { showAuth(); return; }
   showApp();
   await reloadFromCache();   // render from cache first — instant, works offline
+  // Previews the browser already knows, so the first paint has them: a card
+  // that pops its icon in a beat later reads as a page still loading.
+  try { for (const [k, v] of await loadPreviews()) previews.set(k, v); } catch (e) {}
   render();
   await doSync({ quiet: false });
 

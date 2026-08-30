@@ -10,3 +10,4 @@ PyJWT>=2.8
 bcrypt>=4.1                   # password hashing (used directly; passlib is unmaintained)
 python-multipart>=0.0.9       # form parsing for login
 email-validator>=2.1          # EmailStr validation
+httpx>=0.27                   # link-preview fetcher (app/preview.py); also the test client

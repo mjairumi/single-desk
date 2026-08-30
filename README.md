@@ -18,6 +18,7 @@ It's a **runnable backend**, a **working extension skeleton**, and a **precise s
 - **Backend**: signup / login / refresh (rotating tokens) + **rev-based delta sync** with **last-write-wins** and tombstones. Tested end-to-end against Postgres. `render.yaml` deploys it as-is (`alembic upgrade head` builds the schema on first boot).
 - **Extension**: MV3 manifest + service worker + entity-sync engine + **two-way bookmark engine** (both directions + echo-suppression implemented; a few reconciliation edge cases are marked `TODO`) + popup + options. All JS passes `node --check`.
 - **Web app**: live in `backend/app/static/`, served same-origin at `/`. Login/signup gate, IndexedDB cache for offline, a **Groups** (tab sessions) view, and every original bucket/review/playbook feature. Verified end-to-end in headless Chromium (`backend/tests/web_e2e.py`), two browser contexts on one account.
+- **Link previews**: cards show the site's favicon, its description and its og:image, so you can tell what a link is at a glance and file it without opening it. The server does the scraping (`/api/preview`, SSRF-guarded, cached in Postgres) — your browser never phones the sites you saved. Fetched lazily as cards scroll into view; verified by `backend/tests/preview_e2e.py`.
 
 ### What's still to build
 Wiring the extension to the deployed API (M4–M5), hardening the bookmark reconciliation edge cases (M6), a backend pytest suite, and Chrome Web Store packaging. See `docs/ROADMAP.md`.

@@ -59,13 +59,15 @@ async function apiFetch(path, opts = {}) {
 }
 
 // ---------- IndexedDB cache ----------
-const DB = "signaldesk-web", VER = 1;
+const DB = "signaldesk-web", VER = 2;
 function open() {
   return new Promise((res, rej) => {
     const q = indexedDB.open(DB, VER);
     q.onupgradeneeded = () => { const db = q.result;
       for (const s of ["items", "sessions"]) if (!db.objectStoreNames.contains(s)) db.createObjectStore(s, { keyPath: "id" });
       if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "k" });
+      // v2: cached link previews, keyed by the URL as the card holds it.
+      if (!db.objectStoreNames.contains("previews")) db.createObjectStore("previews", { keyPath: "key" });
     };
     q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
   });
@@ -122,3 +124,34 @@ export async function syncNow() {
 // Convenience for the UI: the non-deleted items/sessions to render.
 export async function liveItems() { return (await Store.all("items")).filter((r) => !r.deleted); }
 export async function liveSessions() { return (await Store.all("sessions")).filter((r) => !r.deleted); }
+
+// ---------- link previews ----------
+// Derived data, not entities: no id, no rev, no tombstone, never pushed. The
+// server owns the fetching (app/preview.py) and its own long-lived cache; the
+// browser just remembers what it has already been told so a re-render is free.
+//
+// Rows are keyed by the URL exactly as the item holds it, because that is what
+// a card has in hand. The server echoes it back as `requested_url` alongside
+// the normalized `url`, so two spellings of one page share a server fetch while
+// each keeps its own local entry.
+const PREVIEW_TTL = { ok: 7 * 86400000, error: 86400000 };
+
+function previewFresh(row) {
+  return row && Date.now() - (row._at || 0) < (PREVIEW_TTL[row.status] || PREVIEW_TTL.error);
+}
+
+// Everything still fresh, as a Map the UI can consult synchronously while it
+// builds HTML. Stale rows are simply left out — they get re-asked on sight.
+export async function loadPreviews() {
+  const out = new Map();
+  for (const row of await Store.all("previews")) if (previewFresh(row)) out.set(row.key, row);
+  return out;
+}
+
+export async function fetchPreviews(urls) {
+  if (!urls.length) return [];
+  const res = await apiFetch("/api/preview", { method: "POST", body: { urls } });
+  const rows = (res.previews || []).map((p) => ({ ...p, key: p.requested_url, _at: Date.now() }));
+  for (const row of rows) await Store.put("previews", row);
+  return rows;
+}

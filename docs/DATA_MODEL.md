@@ -50,6 +50,24 @@ Index: `(user_id, rev)` — makes "changed since rev N" a range scan.
 | rev | bigint | indexed with user_id |
 | created_at, updated_at | timestamptz | |
 
+### `link_previews` (derived — NOT a syncable entity)
+Cached Open Graph / favicon metadata so cards can show what a link is. No
+`user_id`, no `rev`, no tombstone: page metadata is public, so one fetch serves
+every user and every device, and the table can be dropped at any time at the
+cost of a re-fetch.
+
+| column | type | notes |
+|---|---|---|
+| url_hash | varchar(64) PK | sha256 of the normalized URL (a URL is too long to index) |
+| url | text | the normalized URL |
+| status | varchar(16) | `ok` or `error` |
+| title, description, image_url, icon_url, site_name | text | scraped; all nullable |
+| error | text | why the fetch failed, when `status='error'` |
+| fetched_at | timestamptz | drives the refresh TTL (30 d ok / 1 d error) |
+
+Written only by `POST /api/preview` (`app/routers/preview.py`); fetched by
+`app/preview.py`. Never appears in a sync payload.
+
 ## The three sync fields (every syncable row)
 - **`rev`** — server-authoritative. The server increments `users.sync_rev` (under a row lock) once per accepted write and stamps it here. Clients pull `?since_rev=` and never set it.
 - **`deleted`** — soft delete. Deletes must propagate, so they're tombstones, not row removals. (A later GC job may purge old tombstoned rows; clients that have caught up won't care.)

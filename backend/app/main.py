@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
 from .routers import auth as auth_router
+from .routers import preview as preview_router
 from .routers import sync as sync_router
 
 settings = get_settings()
@@ -51,6 +52,7 @@ def health() -> dict:
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(sync_router.router, prefix="/api", tags=["sync"])
+app.include_router(preview_router.router, prefix="/api", tags=["preview"])
 
 # Serve the SPA last, as a catch-all, so /api/* still resolves above.
 _static_dir = Path(__file__).parent / "static"

@@ -25,6 +25,9 @@ flowchart TB
 **Backend (`backend/`)** — FastAPI + synchronous SQLAlchemy + Postgres.
 - `/api/auth/*` — signup, login, refresh (rotating), logout, me.
 - `/api/sync` — `GET ?since_rev=N` (pull) and `POST` (push). This is the only data path clients need; both items and tab-sessions flow through it.
+- `/api/preview` — server-side link-preview scraping + cache, so a card can show
+  what a link is without the browser phoning every domain you saved
+  (`docs/API.md`). Derived data: it never enters the sync protocol.
 - Serves the web SPA as static files for all non-`/api` routes, so web app and API share one origin (no CORS for the web app; the extension is cross-origin and allow-listed via `CORS_ORIGINS`).
 
 **Web app (`web/`)** — the Signal Desk UI. Same buckets/review/playbook as the standalone version, but its data layer is a `SyncClient` (talks to `/api/sync`) backed by an IndexedDB cache for offline use, gated behind login/signup. Adds a **Sessions** view for tab groups.

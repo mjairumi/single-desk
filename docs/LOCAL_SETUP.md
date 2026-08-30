@@ -145,10 +145,13 @@ persistence, and two contexts on one account converging):
 cd backend && source .venv/bin/activate
 pip install playwright && playwright install chromium
 python tests/web_e2e.py          # with the server running -> ALL M3 CHECKS PASSED
+python tests/preview_e2e.py      # link previews -> ALL PREVIEW CHECKS PASSED
 ```
 
-It signs up throwaway `web+<random>@example.com` accounts, so point it at a
-local server, never production.
+They sign up throwaway `web+<random>@example.com` / `pv+<random>@example.com`
+accounts, so point them at a local server, never production. `preview_e2e.py`
+additionally needs **outbound network access** — it previews real public pages,
+because the point is scraping real-world markup.
 
 ## The extension
 

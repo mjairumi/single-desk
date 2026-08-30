@@ -95,6 +95,34 @@ class TabSession(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 
+# ---- Derived data (NOT syncable) -------------------------------------------
+
+class LinkPreview(Base):
+    """Cached Open Graph / favicon metadata for a URL, so cards can show what a
+    link actually is without opening it.
+
+    Deliberately outside the sync model: no `user_id`, no `rev`, no tombstone.
+    Page metadata is public information, so one fetch serves every user and
+    every device, and dropping the table costs nothing but a re-fetch. See
+    app/preview.py for the fetcher and its SSRF guard.
+    """
+    __tablename__ = "link_previews"
+
+    # sha256 of the normalized URL — a URL is too long to index directly.
+    url_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    url: Mapped[str] = mapped_column(Text)
+
+    status: Mapped[str] = mapped_column(String(16), default="ok")   # ok | error
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    icon_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    site_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    fetched_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
 # Composite indexes to make "changed since rev N for this user" a fast range scan.
 Index("ix_items_user_rev", Item.user_id, Item.rev)
 Index("ix_tab_sessions_user_rev", TabSession.user_id, TabSession.rev)
