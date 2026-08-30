@@ -11,7 +11,10 @@ What it proves:
   * requests are batched and capped, not one-per-card;
   * a reload paints from the IndexedDB cache without re-asking the server;
   * the review screen — where identifying a link matters most — shows it too;
-  * a URL that cannot be fetched degrades to the plain card, no broken image.
+  * a URL that cannot be fetched degrades to the plain card, no broken image;
+  * framing headers are recorded, so the client never tries to iframe a site
+    that would refuse;
+  * "Peek" opens ONE window and reuses it for the next link.
 
 Needs OUTBOUND NETWORK: it previews real public pages, because the whole point
 is scraping real-world markup.
@@ -87,6 +90,19 @@ with sync_playwright() as p:
 
     page.on("request", on_request)
 
+    # Preview rows as the server returned them, for the embeddability checks.
+    preview_rows = {}
+
+    def on_response(res):
+        if res.request.method == "POST" and res.url.endswith("/api/preview"):
+            try:
+                for row in res.json().get("previews", []):
+                    preview_rows[row["requested_url"]] = row
+            except Exception:
+                pass
+
+    page.on("response", on_response)
+
     # ---------- sign up ----------
     page.goto(BASE)
     page.wait_for_selector("#authGate", state="visible", timeout=10000)
@@ -134,6 +150,35 @@ with sync_playwright() as p:
     check("an unfetchable URL still renders a card", dead.count() == 1)
     check("an unfetchable URL shows no broken preview",
           dead.locator("img.pv-thumb").count() == 0 and dead.locator(".fav img").count() == 0)
+
+    # ---------- framing headers are recorded ----------
+    # The browser cannot discover this later: a blocked iframe still fires
+    # `load` and same-origin policy hides its contents, so the answer has to
+    # come from the fetch. Wrong in the safe direction costs only a popup.
+    check("a site sending X-Frame-Options is recorded as not embeddable",
+          preview_rows.get(RICH_URL, {}).get("embeddable") is False,
+          extra=str(preview_rows.get(RICH_URL, {}).get("embeddable")))
+    check("a site with no framing headers is recorded as embeddable",
+          preview_rows.get(PLAIN_URL, {}).get("embeddable") is True,
+          extra=str(preview_rows.get(PLAIN_URL, {}).get("embeddable")))
+
+    # ---------- peek: one window, reused ----------
+    with page.expect_popup() as popup_info:
+        card_for(page, PLAIN_URL).locator('[data-act="peek"]').click()
+    peek_win = popup_info.value
+    peek_win.wait_for_load_state("domcontentloaded", timeout=25000)
+    check("Peek opens a window on the link", "example.com" in peek_win.url)
+    open_windows = len(ctx.pages)
+
+    # The whole point of the named target: the SECOND peek must steer the
+    # window that is already open, not pile up another one.
+    card_for(page, "https://example.org").locator('[data-act="peek"]').click()
+    page.wait_for_timeout(3000)
+    check("a second peek reuses the same window, opening no new one",
+          len(ctx.pages) == open_windows, extra=f"{len(ctx.pages)} vs {open_windows}")
+    check("the reused window navigated to the second link",
+          "example.org" in peek_win.url, extra=peek_win.url)
+    peek_win.close()
 
     # ---------- the review screen shows it too ----------
     # Runs while the Inbox is still short: `#rev-skip` walks the queue in order,

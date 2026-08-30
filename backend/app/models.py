@@ -118,6 +118,11 @@ class LinkPreview(Base):
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     icon_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     site_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Whether the page allows being framed on another origin. Recorded because
+    # the answer is free at fetch time and unknowable in the browser later.
+    # NULL = never determined (a row cached before this column existed), which
+    # counts as stale so it is re-fetched rather than assumed.
+    embeddable: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     fetched_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=now_utc)

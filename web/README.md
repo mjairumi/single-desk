@@ -49,6 +49,25 @@ No build step: `index.html` loads `app.js` as an ES module, which imports
 - **Theme and the default shelf life stay in `localStorage`** as per-device
   preferences. They aren't entities in the data model, so they don't sync.
 
+## Peek — one window, reused
+
+Triage sometimes needs an actual look, not just a preview. **Peek** (on Inbox
+cards, and the first action on the review screen) opens the link in a popup
+window — and every later peek steers that *same* window instead of opening
+another, so working through thirty links costs one window rather than thirty
+tabs. The mechanism is the second argument to `window.open`: a named target
+makes the browser reuse the window already answering to that name, and the name
+outlives a page reload.
+
+**Why not an iframe.** Most of the web refuses to be framed — `X-Frame-Options`
+or `frame-ancestors` blocked 8 of 11 sites sampled while building this,
+including GitHub, MDN and Hacker News. Worse, the failure is undetectable from
+JavaScript: a blocked frame still fires `load`, and same-origin policy hides
+what's inside, so the card would show a permanently blank box with no fallback.
+A popup is subject to none of that. The server does record an `embeddable` flag
+per URL (`docs/API.md`) from headers it already has in hand, so an in-page
+iframe can later be used for the minority of sites that permit it.
+
 ## Groups (tab sessions)
 
 The Groups view lists synced `tab_sessions`, and supports rename, delete, and

@@ -62,6 +62,7 @@ cost of a re-fetch.
 | url | text | the normalized URL |
 | status | varchar(16) | `ok` or `error` |
 | title, description, image_url, icon_url, site_name | text | scraped; all nullable |
+| embeddable | bool NULL | may the page be framed on another origin? **NULL = never determined** (a row cached before the column existed), which counts as stale so the row re-fetches rather than serving a guess |
 | error | text | why the fetch failed, when `status='error'` |
 | fetched_at | timestamptz | drives the refresh TTL (30 d ok / 1 d error) |
 

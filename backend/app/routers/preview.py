@@ -29,7 +29,7 @@ from ..deps import get_current_user
 router = APIRouter()
 
 _CACHED_FIELDS = ("url", "status", "title", "description", "image_url",
-                  "icon_url", "site_name", "error", "fetched_at")
+                  "icon_url", "site_name", "embeddable", "error", "fetched_at")
 
 
 def _out(requested_url: str, row: dict) -> schemas.LinkPreviewOut:
@@ -42,6 +42,7 @@ def _out(requested_url: str, row: dict) -> schemas.LinkPreviewOut:
         image_url=row.get("image_url"),
         icon_url=row.get("icon_url"),
         site_name=row.get("site_name"),
+        embeddable=bool(row.get("embeddable")),
         error=row.get("error"),
     )
 
@@ -81,7 +82,7 @@ def previews(
             select(models.LinkPreview).where(models.LinkPreview.url_hash.in_(list(wanted)))
         ).scalars().all()
         for row in rows:
-            if preview_lib.is_stale(row.status, row.fetched_at):
+            if preview_lib.is_stale(row.status, row.fetched_at, row.embeddable):
                 continue  # let it fall through to a re-fetch
             cached[row.url_hash] = {f: getattr(row, f) for f in _CACHED_FIELDS}
 
