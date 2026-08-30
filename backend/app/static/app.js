@@ -313,6 +313,33 @@ function renderNav() {
 }
 
 // ============================================================================
+// Peek — one window, reused
+//
+// A preview tells you what a link is; sometimes you still need to LOOK before
+// you can file it. Framing the page is not an option: most of the web sends
+// X-Frame-Options or frame-ancestors (8 of 11 sites sampled while building
+// this, including GitHub, MDN and Hacker News), a blocked iframe still fires
+// `load`, and same-origin policy hides what's inside — so a client that tries
+// paints a blank rectangle it cannot even detect. A popup window is subject to
+// none of that: no framing header can refuse it.
+//
+// The reuse trick is the second argument. Passing a NAME makes the browser
+// steer the window that already carries that name instead of opening another,
+// so triaging thirty links costs one window rather than thirty tabs. The name
+// outlives this page, so a reload keeps reusing the same window.
+// ============================================================================
+const PEEK_TARGET = "signal-desk-peek";
+
+function peek(url) {
+  if (!url) return;
+  // Size applies to the first open only; later calls just navigate the window
+  // that answers to PEEK_TARGET, which is exactly the point.
+  const win = window.open(url, PEEK_TARGET, "width=1040,height=820");
+  if (!win) { toast("Your browser blocked the peek window — allow popups for this site."); return; }
+  win.focus();
+}
+
+// ============================================================================
 // Link previews
 //
 // Triage is a glance-and-decide loop, so a card has to say what a link IS
@@ -562,7 +589,7 @@ function renderBucket(b) {
   }[b];
 
   const acts = () => {
-    if (b === "inbox") return A("keep", "→ Keep") + A("round", "↻ Rounds") + A("later", "⏱ Later") + A("explore", "✦ Explore") + A("edit", "Edit", "ghost") + A("archive", "Archive", "ghost") + A("discard", "Discard", "ghost danger");
+    if (b === "inbox") return A("peek", "▣ Peek", "ghost") + A("keep", "→ Keep") + A("round", "↻ Rounds") + A("later", "⏱ Later") + A("explore", "✦ Explore") + A("edit", "Edit", "ghost") + A("archive", "Archive", "ghost") + A("discard", "Discard", "ghost danger");
     if (b === "rounds") return A("visit", "↗ Visit", "primary") + A("snooze", "Snooze") + A("edit", "Edit", "ghost") + A("retire", "Retire → Library", "ghost") + A("discard", "Discard", "ghost danger");
     if (b === "queue") return A("read", "↗ Read & keep", "primary") + A("release", "Release") + A("snooze", "Snooze") + A("edit", "Edit", "ghost") + A("discard", "Discard", "ghost danger");
     return "";
@@ -803,16 +830,17 @@ async function handleAct(act, id) {
     case "round": openRoundPrompt(it); return;
     case "later": await moveTo(it, "queue"); toast("Added to Read-later."); return;
     case "explore": await moveTo(it, "explore"); toast("Parked in Explore — no rush."); return;
+    case "peek": peek(it.url); return;
     case "visit":
     case "visit-lib":
-      window.open(it.url, "_blank", "noopener");
+      peek(it.url);
       if (it.bucket === "rounds") {
         await upsertItem({ id: it.id, last_visited: iso(), snoozed_until: null });
         await afterMutation();
       }
       return;
     case "read":
-      window.open(it.url, "_blank", "noopener");
+      peek(it.url);
       await moveTo(it, "library");
       toast("Read → kept in Library.");
       return;
@@ -1010,7 +1038,7 @@ function renderReview() {
   document.getElementById("rev-bar").style.width = Math.round((revIdx / revTotal) * 100) + "%";
   let acts;
   if (it.bucket === "inbox") {
-    acts = A("r-open", "↗ Open", "ghost") + A("r-keep", "→ Keep", "primary") + A("r-round", "↻ Rounds") + A("r-later", "⏱ Read-later") + A("r-explore", "✦ Explore") + A("r-archive", "Archive", "ghost") + A("r-discard", "Discard", "ghost danger");
+    acts = A("r-open", "▣ Peek", "ghost") + A("r-keep", "→ Keep", "primary") + A("r-round", "↻ Rounds") + A("r-later", "⏱ Read-later") + A("r-explore", "✦ Explore") + A("r-archive", "Archive", "ghost") + A("r-discard", "Discard", "ghost danger");
   } else if (it.bucket === "queue") {
     acts = A("r-open", "↗ Read it", "primary") + A("r-keep", "Keep in Library") + A("r-snooze", "Snooze 2w") + A("r-discard", "Release", "ghost danger");
   } else {
@@ -1047,7 +1075,7 @@ async function reviewAct(act) {
   if (!entry) return;
   const it = entry.it;
   switch (act) {
-    case "r-open": window.open(it.url, "_blank", "noopener"); return;
+    case "r-open": peek(it.url); return;
     case "r-keep": await moveTo(it, "library"); break;
     case "r-round": await moveTo(it, "rounds"); break;
     case "r-later": await moveTo(it, "queue"); break;

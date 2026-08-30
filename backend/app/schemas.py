@@ -106,6 +106,7 @@ class LinkPreviewOut(BaseModel):
     image_url: str | None = None
     icon_url: str | None = None
     site_name: str | None = None
+    embeddable: bool = False        # may this page be shown in an <iframe>?
     error: str | None = None
 
 

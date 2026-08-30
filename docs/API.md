@@ -90,7 +90,7 @@ for the URLs they're about to paint.
     "description": "The Python micro framework for building web applications.",
     "image_url": "https://repository-images.githubusercontent.com/…",
     "icon_url": "https://github.githubassets.com/favicons/favicon.png",
-    "site_name": "GitHub", "error": null } ] }
+    "site_name": "GitHub", "embeddable": false, "error": null } ] }
 ```
 - **Max 24 URLs** per request (`422` beyond that) — clients batch what's on screen.
 - `requested_url` echoes your spelling; `url` is the server's normalized form. Two
@@ -104,6 +104,14 @@ for the URLs they're about to paint.
 - **Auth required.** Not because previews are private — the cache is global,
   since page metadata is public — but because an unauthenticated "fetch this URL
   for me" endpoint is an open proxy.
+- `embeddable` says whether the page may be shown in an `<iframe>` on another
+  origin — false when it sends `X-Frame-Options` or a `frame-ancestors` that
+  doesn't include `*`. It is recorded because the answer is free at fetch time
+  and **unknowable in the browser afterwards**: a blocked frame still fires
+  `load`, and same-origin policy hides its contents, so a client that guesses
+  paints a blank box it cannot detect. Most of the web says no, which is why
+  the web app peeks in a reused popup window instead. Reported conservatively:
+  a wrong `false` costs a popup, a wrong `true` costs an empty rectangle.
 - URLs are fetched with an **SSRF guard**: http(s) only, every resolved address
   checked against the private/loopback/link-local ranges, redirects followed
   hop-by-hop with the same check, 512 KB and ~6 s ceilings. See `app/preview.py`.
