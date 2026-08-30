@@ -4,7 +4,7 @@
 import { apiFetch, isLoggedIn } from "./api.js";
 import { getAll, put, get, getMeta, setMeta } from "./store.js";
 
-const ITEM_FIELDS = ["id","url","title","note","tags","bucket","cadence_days","last_visited",
+const ITEM_FIELDS = ["id","url","title","note","tags","bucket","topic","cadence_days","last_visited",
   "shelf_days","added_at","archived_at","snoozed_until","deleted","updated_at"];
 const SESSION_FIELDS = ["id","name","tabs","deleted","updated_at"];
 

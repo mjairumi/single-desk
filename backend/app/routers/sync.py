@@ -29,8 +29,9 @@ from ..models import now_utc
 router = APIRouter()
 
 _ITEM_FIELDS = (
-    "url", "title", "note", "tags", "bucket", "cadence_days", "last_visited",
-    "shelf_days", "added_at", "archived_at", "snoozed_until", "deleted",
+    "url", "title", "note", "tags", "bucket", "topic", "cadence_days",
+    "last_visited", "shelf_days", "added_at", "archived_at", "snoozed_until",
+    "deleted",
 )
 _SESSION_FIELDS = ("name", "tabs", "deleted")
 
