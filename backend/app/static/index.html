@@ -197,7 +197,6 @@ label.field{display:block;font-size:12px;font-weight:600;color:var(--muted);marg
 }
 .item .fav{width:30px;height:30px;border-radius:7px;flex:none;background:var(--surface-2);border:1px solid var(--line);
   display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent);font-family:"Archivo";overflow:hidden}
-.item .fav img{width:100%;height:100%;object-fit:cover}
 .item .body{flex:1;min-width:0}
 .item .title{font-weight:600;line-height:1.3;word-break:break-word}
 .item .title a{text-decoration:none}
@@ -211,6 +210,16 @@ label.field{display:block;font-size:12px;font-weight:600;color:var(--muted);marg
 .pill.over{background:var(--crit-soft);color:var(--crit)}
 .pill.ok{background:var(--accent-soft);color:var(--accent)}
 .pill.dot::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+/* Link preview: the favicon in the .fav square, plus an og:image thumbnail and
+   a description below the URL. Both arrive asynchronously and the slot is
+   hidden while empty, so a card never sits as a half-built box waiting. */
+.item .fav img{width:100%;height:100%;object-fit:cover}
+.item .pv:empty{display:none}
+.item .pv{display:flex;gap:11px;align-items:flex-start;margin-top:8px}
+.pv-thumb{width:104px;height:66px;flex:none;object-fit:cover;border-radius:8px;
+  border:1px solid var(--line);background:var(--surface-2)}
+.pv-desc{font-size:12.5px;line-height:1.5;color:var(--muted);min-width:0;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .item .acts{display:flex;gap:5px;align-items:center;flex-wrap:wrap;flex:none}
 .item .acts .btn.sm{border-color:var(--line)}
 
@@ -252,6 +261,11 @@ label.field{display:block;font-size:12px;font-weight:600;color:var(--muted);marg
 .review-main .title{font-family:"Archivo";font-weight:700;font-size:20px;line-height:1.2;word-break:break-word}
 .review-main .url{font-family:"IBM Plex Mono";font-size:12.5px;color:var(--faint);margin-top:6px;word-break:break-all}
 .review-main .note{color:var(--muted);margin-top:12px}
+.review-pv{display:flex;gap:14px;align-items:flex-start;margin-top:14px}
+.review-pv:empty{display:none}
+.review-pv img{width:150px;height:96px;flex:none;object-fit:cover;border-radius:10px;
+  border:1px solid var(--line);background:var(--surface-2)}
+.review-pv .pv-desc{font-size:13.5px;-webkit-line-clamp:5}
 .review-acts{padding:16px 22px 22px;display:flex;gap:8px;flex-wrap:wrap}
 .review-rule{margin-top:14px;border-top:1px dashed var(--line-strong);padding-top:14px}
 .review-rule h4{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin:0 0 8px;font-family:"IBM Plex Mono";font-weight:500}

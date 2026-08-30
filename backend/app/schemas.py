@@ -6,6 +6,8 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from . import preview
+
 
 # ---- auth ----
 class SignupIn(BaseModel):
@@ -85,3 +87,27 @@ class SyncOut(BaseModel):
     items: list[ItemOut] = []
     sessions: list[TabSessionOut] = []
     server_rev: int
+
+
+# ---- link previews (derived, not synced) ----
+# The client sends the URLs it is about to paint and gets one result per URL,
+# echoed back under `requested_url` so it can match results to cards without
+# reimplementing the server's normalization.
+class PreviewIn(BaseModel):
+    urls: list[str] = Field(default_factory=list, max_length=preview.MAX_URLS_PER_REQUEST)
+
+
+class LinkPreviewOut(BaseModel):
+    requested_url: str
+    url: str
+    status: str                      # ok | error
+    title: str | None = None
+    description: str | None = None
+    image_url: str | None = None
+    icon_url: str | None = None
+    site_name: str | None = None
+    error: str | None = None
+
+
+class PreviewOut(BaseModel):
+    previews: list[LinkPreviewOut] = []

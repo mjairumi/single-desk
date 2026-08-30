@@ -71,5 +71,42 @@ pull ?since_rev=<cursor> → apply, set cursor = server_rev
 ```
 Run on an interval, on local change (debounced), and on reconnect.
 
+## Link previews
+Cards show what a link *is* (favicon, description, og:image) so triage doesn't
+mean opening every tab. The server fetches and caches the metadata; clients ask
+for the URLs they're about to paint.
+
+### `POST /api/preview`
+```json
+{ "urls": ["https://github.com/pallets/flask", "https://example.com"] }
+```
+→ one result per URL, in `previews`:
+```json
+{ "previews": [
+  { "requested_url": "https://github.com/pallets/flask",
+    "url": "https://github.com/pallets/flask",
+    "status": "ok",
+    "title": "GitHub - pallets/flask: The Python micro framework…",
+    "description": "The Python micro framework for building web applications.",
+    "image_url": "https://repository-images.githubusercontent.com/…",
+    "icon_url": "https://github.githubassets.com/favicons/favicon.png",
+    "site_name": "GitHub", "error": null } ] }
+```
+- **Max 24 URLs** per request (`422` beyond that) — clients batch what's on screen.
+- `requested_url` echoes your spelling; `url` is the server's normalized form. Two
+  spellings of one page share a single fetch and a single cache row.
+- `status` is `ok` or `error`; on `error`, `error` says why (`http 404`,
+  `dns lookup failed`, `blocked: non-public address`, …) and the client falls
+  back to the plain card. **Failures are cached too**, briefly, so a dead link
+  isn't re-fetched on every render.
+- Cached rows are served immediately; only misses and stale rows cost a fetch.
+  TTL: 30 days for a success, 1 day for a failure.
+- **Auth required.** Not because previews are private — the cache is global,
+  since page metadata is public — but because an unauthenticated "fetch this URL
+  for me" endpoint is an open proxy.
+- URLs are fetched with an **SSRF guard**: http(s) only, every resolved address
+  checked against the private/loopback/link-local ranges, redirects followed
+  hop-by-hop with the same check, 512 KB and ~6 s ceilings. See `app/preview.py`.
+
 ## Errors
 Standard HTTP codes; body `{ "detail": "…" }`. `401` on missing/expired access token (client should refresh once and retry — the extension's `api.js` does this automatically).
