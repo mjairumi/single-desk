@@ -65,6 +65,12 @@ class Item(Base):
     tags: Mapped[list] = mapped_column(JSONB, default=list)
     # inbox | library | rounds | queue | explore | archive
     bucket: Mapped[str] = mapped_column(String(16), default="inbox")
+    # The catalog axis. `bucket` says WHEN you deal with a link; `topic` says
+    # what it is ABOUT, and unlike `tags` it is single-valued on purpose — one
+    # decision per item, so a view can group by it with no duplicates and no
+    # ambiguity about where something lives. User-defined, free text, NULL
+    # until catalogued. Not to be confused with `shelf_days` below.
+    topic: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     cadence_days: Mapped[int | None] = mapped_column(Integer, nullable=True)      # rounds
     last_visited: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -90,7 +90,7 @@ export const Store = {
   async setMeta(k, v) { const db = await open(); return done(db.transaction("meta", "readwrite").objectStore("meta").put({ k, v })); },
 };
 
-const ITEM_FIELDS = ["id","url","title","note","tags","bucket","cadence_days","last_visited","shelf_days","added_at","archived_at","snoozed_until","deleted","updated_at"];
+const ITEM_FIELDS = ["id","url","title","note","tags","bucket","topic","cadence_days","last_visited","shelf_days","added_at","archived_at","snoozed_until","deleted","updated_at"];
 const SESSION_FIELDS = ["id","name","tabs","deleted","updated_at"];
 const pick = (r, f) => Object.fromEntries(f.map((k) => [k, r[k] ?? (k === "tags" ? [] : null)]));
 

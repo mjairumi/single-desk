@@ -146,12 +146,43 @@ cd backend && source .venv/bin/activate
 pip install playwright && playwright install chromium
 python tests/web_e2e.py          # with the server running -> ALL M3 CHECKS PASSED
 python tests/preview_e2e.py      # link previews -> ALL PREVIEW CHECKS PASSED
+python tests/catalog_e2e.py      # the topic axis -> ALL CATALOG CHECKS PASSED
+python tests/classify_offline.py # the catalog tool's data paths
 ```
 
 They sign up throwaway `web+<random>@example.com` / `pv+<random>@example.com`
 accounts, so point them at a local server, never production. `preview_e2e.py`
 additionally needs **outbound network access** — it previews real public pages,
 because the point is scraping real-world markup.
+
+## Cataloguing a backlog with Claude
+
+Sorting 150 saved links by hand is why backlogs stay backlogs. `tools/classify.py`
+is a one-time assist: it reads your items, warms the link-preview cache so the
+model sees each page's real title and description rather than a URL slug, asks
+Claude for a topic vocabulary covering the whole collection, then files every
+item against it.
+
+```bash
+cd backend && source .venv/bin/activate
+pip install -r tools/requirements.txt
+export ANTHROPIC_API_KEY=...          # or: ant auth login
+
+# look, change nothing — writes catalog-proposals.json for you to read
+python tools/classify.py --base http://127.0.0.1:8000 --email you@example.com
+
+# try it on ten items first
+python tools/classify.py --base ... --email ... --limit 10
+
+# write back only the confident ones; the rest stay for hand-triage
+python tools/classify.py --base ... --email ... --apply --min-confidence 0.75
+```
+
+Nothing is written without `--apply`. Proposed tags are **unioned** with the ones
+you set by hand, never replaced, and items below the confidence threshold are
+left untouched so you triage them yourself. Two passes are used on purpose:
+asking for topics per-batch invents a fresh vocabulary every 20 items and leaves
+you with "AI", "Machine learning" and "LLMs" as three separate shelves.
 
 ## The extension
 

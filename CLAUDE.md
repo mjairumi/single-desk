@@ -15,7 +15,7 @@ You are finishing a multi-device product. A lot already works; your job is to co
 - **Sync is last-write-wins by `updated_at`.** The server bumps a per-user `rev` on every accepted write; clients pull `?since_rev=`. Never let a client set `rev`.
 - **Tombstones, never hard deletes** for synced entities (`deleted = true`). Real row deletion is a separate, later GC job.
 - **Client-generated UUIDs.** Entities are created offline with their final id; the server never renumbers.
-- **The extension only ever touches the managed bookmark subtree** (`Other Bookmarks → Signal Desk`). Never create/edit/delete/move a bookmark outside it.
+- **The extension may READ the whole bookmark tree, but only ever WRITES inside the managed subtree** (`Other Bookmarks → Signal Desk`). Reading everywhere is what lets an existing bookmark collection be imported; never create/edit/delete/move a bookmark outside the subtree. (Decided 2026-08-30: importing a backlog is worth a read, destroying an original never is — the user deletes their own originals once they trust the mirror.)
 - **Each sensitive change is one operation** and the response's canonical rows win — clients overwrite local state from them.
 
 ## Conventions

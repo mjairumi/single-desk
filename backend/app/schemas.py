@@ -50,6 +50,7 @@ class ItemIn(BaseModel):
     note: str = ""
     tags: list[str] = []
     bucket: str = "inbox"
+    topic: str | None = None
     cadence_days: int | None = None
     last_visited: dt.datetime | None = None
     shelf_days: int | None = None

@@ -51,7 +51,7 @@ function savePrefs() {
 let items = [];      // live (non-tombstoned) items, API shape
 let sessions = [];   // live tab sessions, API shape
 let current = "overview";
-let libFilterTag = null, libSearch = "";
+let libFilterTag = null, libSearch = "", libTopic = null;
 let explFilterTag = null, explSearch = "";
 let main = null;
 
@@ -111,6 +111,24 @@ function queueSoon(it) { return !queueOverdue(it) && now() > queueExpires(it) - 
 function archiveOld(it) { return now() > (ms(it.archived_at) ?? ms(it.added_at) ?? now()) + 90 * DAY; }
 
 function byBucket(b) { return items.filter((it) => it.bucket === b); }
+
+// ---- the catalog axis ------------------------------------------------------
+// `bucket` is WHEN you deal with a link, `topic` is what it's ABOUT. Topics are
+// single-valued and user-invented, so they are derived from the data rather
+// than configured anywhere: whatever you have typed IS the catalog.
+const UNCATALOGUED = "\u2014 Uncatalogued";
+function topicOf(it) { const t = (it.topic || "").trim(); return t || null; }
+function topicCounts(list) {
+  const out = {};
+  list.forEach((it) => { const t = topicOf(it); if (t) out[t] = (out[t] || 0) + 1; });
+  return out;
+}
+// Every topic in use anywhere, for the edit modal's autocomplete. Sorted by
+// how much you use them, so the ones you actually reach for come first.
+function allTopics() {
+  const counts = topicCounts(items);
+  return Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+}
 function attn() {
   return {
     inbox: byBucket("inbox").filter((it) => !snoozed(it)),
@@ -146,6 +164,7 @@ async function addItem(o) {
   const patch = {
     url: o.url || null,
     title: o.title || "",
+    topic: o.topic || null,
     note: o.note || "",
     tags: o.tags || [],
     bucket: o.bucket || "inbox",
@@ -443,6 +462,8 @@ function observePreviews() {
 
 function itemCard(it, acts) {
   const tags = (it.tags || []).map((t) => '<span class="tag">' + esc(t) + "</span>").join("");
+  const t = topicOf(it);
+  const topicChip = t ? '<span class="topic" data-topic="' + esc(t) + '">' + esc(t) + "</span>" : "";
   let pills = "";
   if (it.bucket === "rounds") {
     const cls = isRoundOverdue(it) ? "over" : isRoundDue(it) ? "due" : "ok";
@@ -481,7 +502,7 @@ function itemCard(it, acts) {
       (it.url ? '<div class="url">' + esc(host(it.url)) + "</div>" : "") +
       (it.url ? '<div class="pv">' + previewInner(p, "pv-thumb") + "</div>" : "") +
       (it.note ? '<div class="note">' + esc(it.note) + "</div>" : "") +
-      '<div class="meta">' + pills + tags + "</div>" +
+      '<div class="meta">' + topicChip + pills + tags + "</div>" +
     "</div>" +
     '<div class="acts">' + acts + "</div>" +
   "</div>";
@@ -610,25 +631,65 @@ function renderLibrary() {
   const tags = {};
   all.forEach((it) => (it.tags || []).forEach((t) => { tags[t] = (tags[t] || 0) + 1; }));
   const tagKeys = Object.keys(tags).sort();
+  const topics = topicCounts(all);
+  const topicKeys = Object.keys(topics).sort((a, b) => a.localeCompare(b));
+  const uncatalogued = all.filter((it) => !topicOf(it)).length;
+
   const list0 = all.filter((it) => {
+    if (libTopic && topicOf(it) !== (libTopic === UNCATALOGUED ? null : libTopic)) return false;
     if (libFilterTag && (it.tags || []).indexOf(libFilterTag) < 0) return false;
     if (libSearch) {
       const s = libSearch.toLowerCase();
-      return (niceTitle(it) + " " + (it.url || "") + " " + (it.note || "") + " " + (it.tags || []).join(" ")).toLowerCase().indexOf(s) >= 0;
+      return (niceTitle(it) + " " + (it.url || "") + " " + (it.note || "") + " " +
+        (it.topic || "") + " " + (it.tags || []).join(" ")).toLowerCase().indexOf(s) >= 0;
     }
     return true;
   }).sort((x, y) => (ms(y.added_at) ?? 0) - (ms(x.added_at) ?? 0));
+
   const acts = () => A("visit-lib", "↗ Open", "primary") + A("round", "↻ Make a round", "ghost") + A("edit", "Edit", "ghost") + A("archive", "Archive", "ghost") + A("discard", "Discard", "ghost danger");
+
+  // The topic bar is the catalog. It leads, above tags, because a topic is the
+  // one shelf an item sits on while tags are the many ways to reach it.
+  const topicbar = (topicKeys.length || uncatalogued)
+    ? '<div class="filter-tags" style="margin-bottom:10px"><span class="topic' + (!libTopic ? "" : " none") + '" data-topic="__all">All · ' + all.length + "</span>" +
+      topicKeys.map((t) => '<span class="topic' + (libTopic === t ? "" : " none") + '" data-topic="' + esc(t) + '">' + esc(t) + " · " + topics[t] + "</span>").join("") +
+      (uncatalogued ? '<span class="topic' + (libTopic === UNCATALOGUED ? "" : " none") + '" data-topic="' + esc(UNCATALOGUED) + '">Uncatalogued · ' + uncatalogued + "</span>" : "") +
+      "</div>"
+    : "";
   const tagbar = tagKeys.length
     ? '<div class="filter-tags"><span class="tag' + (!libFilterTag ? " on" : "") + '" data-tag="__all">All</span>' +
       tagKeys.map((t) => '<span class="tag' + (libFilterTag === t ? " on" : "") + '" data-tag="' + esc(t) + '">' + esc(t) + " ·" + tags[t] + "</span>").join("") + "</div>"
     : "";
-  const list = list0.length ? ('<div class="list">' + list0.map((it) => itemCard(it, acts(it))).join("") + "</div>") : emptyState("library");
+
+  // Grouped by topic unless you have narrowed to one — then a flat list is
+  // what you asked for and headings would just be noise.
+  let list;
+  if (!list0.length) {
+    list = emptyState("library");
+  } else if (libTopic || libSearch || libFilterTag) {
+    list = '<div class="list">' + list0.map((it) => itemCard(it, acts(it))).join("") + "</div>";
+  } else {
+    const groups = new Map();
+    list0.forEach((it) => {
+      const k = topicOf(it) || UNCATALOGUED;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(it);
+    });
+    // Named topics alphabetically; the uncatalogued pile last, because it is a
+    // to-do rather than a shelf.
+    const keys = [...groups.keys()].sort((a, b) =>
+      a === UNCATALOGUED ? 1 : b === UNCATALOGUED ? -1 : a.localeCompare(b));
+    list = keys.map((k) =>
+      '<div class="group-head"><h3>' + esc(k === UNCATALOGUED ? "Uncatalogued" : k) + "</h3>" +
+        '<span class="n">' + groups.get(k).length + "</span><span class=\"rule\"></span></div>" +
+      '<div class="list">' + groups.get(k).map((it) => itemCard(it, acts(it))).join("") + "</div>").join("");
+  }
+
   main.innerHTML = '<section class="view active">' +
     '<div class="section-title"><h2>Library</h2><span class="sub">' + all.length + " kept · findable when you need them</span></div>" +
-    '<p style="color:var(--muted);max-width:64ch;margin:-6px 0 18px">Reference you return to on demand — docs, tools, the good stuff. No reminders here; these just need to be findable.</p>' +
+    '<p style="color:var(--muted);max-width:64ch;margin:-6px 0 18px">Reference you return to on demand — docs, tools, the good stuff. No reminders here; these just need to be findable. <b>Topics</b> are the shelves — one per link.</p>' +
     '<div class="toolbar"><input class="search" id="lib-search" placeholder="Search library…" value="' + esc(libSearch) + '"><span class="spacer"></span></div>' +
-    tagbar +
+    topicbar + tagbar +
     '<div style="height:14px"></div>' + list + "</section>";
   const s = document.getElementById("lib-search");
   if (s) s.addEventListener("input", () => {
@@ -903,6 +964,11 @@ function openEdit(it) {
   document.getElementById("f-title").value = it && it.title ? it.title : "";
   document.getElementById("f-tags").value = it && it.tags ? it.tags.join(", ") : "";
   document.getElementById("f-note").value = it && it.note ? it.note : "";
+  document.getElementById("f-topic").value = it && it.topic ? it.topic : "";
+  // Autocomplete from the topics already in use, so the catalog converges
+  // instead of sprouting "AI", "ai" and "A.I." as three separate shelves.
+  document.getElementById("topicList").innerHTML =
+    allTopics().map((t) => '<option value="' + esc(t) + '"></option>').join("");
   setBucketSeg(it ? it.bucket : "inbox");
   if (it && it.cadence_days) document.getElementById("f-cadence").value = String(it.cadence_days);
   if (it && it.shelf_days) document.getElementById("f-shelf").value = String(it.shelf_days);
@@ -921,9 +987,11 @@ async function saveEdit() {
     toast(pendingBucket === "explore" ? "Add a URL or a title." : "A URL is required.");
     return;
   }
+  const topicVal = document.getElementById("f-topic").value.trim();
   const data = {
     url: url || null,
     title: titleVal,
+    topic: topicVal || null,
     tags: tagList(document.getElementById("f-tags").value),
     note: document.getElementById("f-note").value.trim(),
     cadence_days: parseInt(document.getElementById("f-cadence").value, 10),
@@ -932,7 +1000,7 @@ async function saveEdit() {
   if (editing) {
     const target = editing;
     const bucketChanged = pendingBucket !== target.bucket;
-    const patch = { id: target.id, url: data.url, title: data.title, tags: data.tags, note: data.note };
+    const patch = { id: target.id, url: data.url, title: data.title, topic: data.topic, tags: data.tags, note: data.note };
     if (!bucketChanged) {
       if (pendingBucket === "rounds") patch.cadence_days = data.cadence_days;
       if (pendingBucket === "queue") patch.shelf_days = data.shelf_days;
@@ -945,7 +1013,7 @@ async function saveEdit() {
     toast("Saved.");
   } else {
     await addItem({
-      url: data.url, title: data.title, tags: data.tags, note: data.note,
+      url: data.url, title: data.title, topic: data.topic, tags: data.tags, note: data.note,
       bucket: pendingBucket, cadence_days: data.cadence_days, shelf_days: data.shelf_days,
     });
     toast("Added to " + BUCKET_LABEL[pendingBucket] + ".");
@@ -1236,6 +1304,15 @@ function wireStaticHandlers() {
     }
     const v = e.target.closest("[data-view]");
     if (v) { go(v.getAttribute("data-view")); return; }
+    const tp = e.target.closest("[data-topic]");
+    if (tp) {
+      const topic = tp.getAttribute("data-topic");
+      libTopic = topic === "__all" ? null : topic;
+      // A topic chip on a card in another bucket is a jump into the catalog.
+      if (current !== "library") { current = "library"; libSearch = ""; libFilterTag = null; render(); }
+      else renderLibrary();
+      return;
+    }
     const t = e.target.closest("[data-tag]");
     if (t) { const tag = t.getAttribute("data-tag"); libFilterTag = tag === "__all" ? null : tag; renderLibrary(); return; }
     const et = e.target.closest("[data-etag]");
@@ -1246,7 +1323,7 @@ function wireStaticHandlers() {
     const v = e.target.closest("[data-view]");
     if (!v) return;
     const dest = v.getAttribute("data-view");
-    if (dest !== "library") { libSearch = ""; libFilterTag = null; }
+    if (dest !== "library") { libSearch = ""; libFilterTag = null; libTopic = null; }
     if (dest !== "explore") { explSearch = ""; explFilterTag = null; }
     go(dest);
   });
